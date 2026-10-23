@@ -73,6 +73,8 @@ export const register: Register = (on, options) => {
   // 나머지는 대표가 저장한 군락을 10초마다 다시 읽어 보여 주고, 자기 활동은 대표에게 넘긴다.
   const me = Math.random().toString(36).slice(2, 10)
   let leader = false, pending: Ev[] = [], syncs = 0
+  // 프로젝트별로 끌 수 있다: 꺼진 폴더에서는 창·상태줄을 띄우지 않고 활동도 세지 않는다
+  let muted = false, cwd = ''
 
   const bump = (k: keyof Tally) => { w.today[k]++; w.total[k]++; w.week ??= emptyTally(); w.week[k] = (w.week[k] ?? 0) + 1 }
   const gain = (n: number) => { const g = Math.max(0, Math.min(n, 8 - hourGain)); hourGain += g; return g }
@@ -149,6 +151,8 @@ export const register: Register = (on, options) => {
   }
 
   on('session.start', async ($, e, next) => {
+    cwd = e.cwd
+    muted = (((await $.store.get('off')) as string[] | undefined) ?? []).includes(cwd)
     const saved = (await $.store.get('world')) as World | undefined
     if (saved && saved.v === 4 && Array.isArray(saved.grid)) { w = saved; w.guests ??= []; w.dex ??= {}; w.newDex ??= []; w.lineage ??= []; say(w, '다시 접속했다. 개미들이 하던 일을 이어 간다.', 'You are back. The ants pick up where they left off.') }
     else {
@@ -189,19 +193,18 @@ export const register: Register = (on, options) => {
     ants = []; syncAnts(w, ants)
     rollDay(w, localDate(), weekKey())
     { const L = (await $.store.get('leader')) as { id: string; ts: number } | undefined
-      if (!L || Date.now() - L.ts > 30000) { leader = true; await $.store.set('leader', { id: me, ts: Date.now() }); await $.store.set('world', w) } }
+      if (!muted && (!L || Date.now() - L.ts > 30000)) { leader = true; await $.store.set('leader', { id: me, ts: Date.now() }); await $.store.set('world', w) } }
     // 사람 없이 돌아가는 세션(-p, SDK, 예약 실행)은 자동화다
     if (!e.isInteractive) { w.instinct = Math.min(10, w.instinct + 0.5); bump('auto') }
-    await $.command.register({ name: 'ant', description: '개미굴 / Ant nest — stats · dex(도감) · species · new <종> · gift(선물 코드) · adopt <code> · card(프로필 카드) · reset' })
-    const opened = await $.ui.open({ id: PANE, title: T.title })
-    paneNote = opened.isPlaced ? 'placed' : opened.reason
+    await $.command.register({ name: 'ant', description: '개미굴 / Ant nest — on · off(이 프로젝트만 끄기) · report · stats · dex(생물 도감) · species · new <종> · gift · adopt <code> · card · reset' })
+    if (!muted) { const opened = await $.ui.open({ id: PANE, title: T.title }); paneNote = opened.isPlaced ? 'placed' : opened.reason }
     $.clock.every(FRAME_MS, () => {
       frame++
       moveAnts(w, ants)
       if (frame % 20 === 0) void (async () => {
         const L = (await $.store.get('leader')) as { id: string; ts: number } | undefined, now = Date.now()
         if (leader && L && L.id !== me && now - L.ts < 30000) leader = false
-        if (!leader && (!L || now - L.ts > 30000)) {
+        if (!leader && !muted && (!L || now - L.ts > 30000)) {
           const saved = (await $.store.get('world')) as World | undefined
           if (saved && saved.v === 4) { w = saved; ants = []; syncAnts(w, ants) }
           leader = true
@@ -229,20 +232,22 @@ export const register: Register = (on, options) => {
         if (w.over) { const succ = w.alates > 0; w = nextGeneration(w); ants = []; syncAnts(w, ants); $.ui.toast(succ ? T.succession : T.collapse); void $.store.set('world', w) }
         if (w.tick % 24 === 0) syncAnts(w, ants)
       }
-      const st = statusText(); if (st) $.ui.status(st)
+      const st = statusText(); if (st && !muted) $.ui.status(st)
       void update($, view, () => ({ frame }))
     })
     return next(e)
   })
 
   on('session.attach', async ($, e, next) => {
+    if (muted) return next(e)
     const opened = await $.ui.open({ id: PANE, title: T.title })
     paneNote = opened.isPlaced ? `placed (${e.surface})` : `${e.surface}: ${opened.reason}`
     return next(e)
   })
 
   // 창을 둘 수 없는 화면에서도 보이도록 입력창 위에 한 줄
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e) => {
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (muted) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
     await read($, view)
     const pop = Math.round(workers(w) + majors(w)), t = w.today
@@ -272,7 +277,21 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'ant' }, async ($, e) => {
-    const arg = e.args.trim()
+    const arg = e.args.trim(), en = lang === 'en'
+    if (arg === 'off' || arg === 'on') {
+      const off = ((await $.store.get('off')) as string[] | undefined) ?? []
+      if (arg === 'off') {
+        if (!off.includes(cwd)) await $.store.set('off', [...off, cwd])
+        muted = true
+        if (leader) { await $.store.set('world', w); await $.store.delete('leader'); leader = false }
+        await $.ui.close({ id: PANE }); $.ui.status(undefined); lastStatus = ''
+        return { text: en ? `Ant nest is off in this project (${cwd}). Your work here won't count. /ant on turns it back on.` : `이 프로젝트(${cwd})에서는 개미굴을 껐습니다. 여기서 한 작업은 개미굴에 반영되지 않습니다. 다시 켜려면 /ant on` }
+      }
+      await $.store.set('off', off.filter(x => x !== cwd)); muted = false
+      await $.ui.open({ id: PANE, title: T.title, focus: true })
+      return { text: en ? 'Ant nest is back on in this project.' : '이 프로젝트에서 개미굴을 다시 켰습니다.' }
+    }
+    if (muted) return { text: en ? 'Ant nest is off in this project. /ant on turns it back on.' : '이 프로젝트에서는 개미굴이 꺼져 있습니다. 다시 켜려면 /ant on' }
     if (/^(new|adopt|reset)/.test(arg) && !leader) { leader = true; await $.store.set('leader', { id: me, ts: Date.now() }) }
     if (arg === 'report' || arg === 'report last') {
       const last = arg === 'report last' && w.lastWeek, r = buildReport(last ? w.lastWeek!.tally : w.week ?? emptyTally(), last ? undefined : w.lastWeek?.tally, lang), en = lang === 'en'
@@ -319,7 +338,7 @@ export const register: Register = (on, options) => {
 
   on('tool.call', async ($, e, next) => {
     const ran = await next(e)
-    if (ran.deny !== undefined) return ran
+    if (ran.deny !== undefined || muted) return ran
     const input = e as unknown as Record<string, unknown>
     const cmd = e.tool === 'Bash' || e.tool === ('PowerShell' as string) ? String(input.command ?? '') : ''
     // 넘기는 것은 도구 이름과 분류 결과뿐이다 (명령·내용은 남기지 않음)

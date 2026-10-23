@@ -57,16 +57,21 @@ test('the band above the prompt and every command answer', async ($, on) => {
   on('fs.read', () => { throw new Error('none') })
   on('fs.write', () => ({ value: undefined }))
   on('session.surfaces', () => ({ value: ['desktop'] }))
+  on('ui.close', () => ({ value: undefined }))
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   for (const surface of ['desktop', 'terminal', 'mobile'] as const) {
     const ui = await $.ui.mount({ plugin: 'ant-nest', component: 'AbovePrompt', surface, props: { hasSurvey: false } } as never)
     expect((await ui.find({ type: 'Text', text: /🐜/ }))?.text).toContain('🐜')
     await ui.unmount()
   }
-  for (const args of ['', 'stats', 'dex', 'report', 'report last', 'species', 'gift', 'card', 'new atta', 'reset']) {
+  for (const args of ['', 'stats', 'dex', 'report', 'report last', 'species', 'gift', 'card', 'new atta', 'off', 'stats', 'on', 'reset']) {
     const r = await $.command.run({ command: 'ant', args } as never)
     expect(JSON.stringify(r).length).toBeGreaterThan(10)
   }
+  await $.command.run({ command: 'ant', args: 'off' } as never)
+  expect(JSON.stringify(await $.command.run({ command: 'ant', args: 'stats' } as never))).toMatch(/꺼져|is off/)
+  await $.command.run({ command: 'ant', args: 'on' } as never)
+  expect(JSON.stringify(await $.command.run({ command: 'ant', args: 'stats' } as never))).not.toMatch(/꺼져 있|is off in/)
   const gift = await $.command.run({ command: 'ant', args: 'gift' } as never)
   const code = /ANT-[0-9A-Z-]+/.exec(JSON.stringify(gift))![0]
   const adopted = await $.command.run({ command: 'ant', args: `adopt ${code}` } as never)

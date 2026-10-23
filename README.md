@@ -94,7 +94,7 @@ Your colony level grows with peak population, years survived, bugs fixed and gen
 
 The Report tab shows this week so far: how your actions split across explore, edit, verify, ship, delegate, parallel agents, MCP, skills, planning and automation, compared with last week, plus what you do well, what you use less, and what to try next. Every Monday the previous week is finalized (`/ant report last`).
 
-The dashboard shows how each number changed since yesterday, like `38 (+5)`. Several Claude Code windows open at once share one colony: one window runs it and the others pass their activity along.
+The dashboard shows how each number changed since yesterday, like `38 (+5)`. There is one colony per computer, shared by every project. Several Claude Code windows open at once share it: one window runs it and the others pass their activity along.
 
 ## Show your colony
 
@@ -104,6 +104,7 @@ Run `/ant stats`, take a screenshot, and post it with the [Show your colony](htt
 
 - `/ant`: open the nest pane
 - `/ant stats`: your usage so far, colony type, tools learned
+- `/ant off` · `/ant on`: turn the nest off (or back on) for the current project only. Off means no pane, no status line, and work there doesn't count
 - `/ant report` · `/ant report last`: your AI use report for this week, or last week's
 - `/ant dex`: the creature dex
 - `/ant gift` · `/ant adopt <code>`: gift a queen, adopt one
@@ -228,7 +229,7 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 리포트 탭에서 이번 주 지금까지의 활동을 봅니다. 탐색·편집·검증·출시·위임·병렬·MCP·스킬·계획·자동화의 비중, 지난주 대비 변화, 잘하고 있는 점·덜 쓰는 점·다음에 해 볼 것이 나옵니다. 매주 월요일에 지난주 리포트가 확정됩니다(`/ant report last`).
 
-대시보드 숫자 옆에는 어제 대비 변화가 `38 (+5)`처럼 붙습니다. Claude Code 창을 여러 개 열어도 군락은 하나입니다. 한 창이 군락을 돌리고, 나머지 창은 자기 활동을 그 창에 넘깁니다.
+대시보드 숫자 옆에는 어제 대비 변화가 `38 (+5)`처럼 붙습니다. 군락은 컴퓨터마다 하나이고 모든 프로젝트가 함께 키웁니다. Claude Code 창을 여러 개 열어도 군락은 하나입니다. 한 창이 군락을 돌리고, 나머지 창은 자기 활동을 그 창에 넘깁니다.
 
 ## 내 군락 자랑하기
 
@@ -238,6 +239,7 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 - `/ant`: 개미굴 창 열기
 - `/ant stats`: 지금까지의 활용, 군락 유형, 배운 도구
+- `/ant off` · `/ant on`: 지금 프로젝트에서만 개미굴 끄기·켜기. 끄면 창과 상태줄이 뜨지 않고 그 프로젝트의 작업은 반영되지 않음
 - `/ant report` · `/ant report last`: 이번 주 AI 활용 리포트, 지난주 리포트
 - `/ant dex`: 생물 도감
 - `/ant gift` · `/ant adopt <코드>`: 여왕 선물하기, 입양하기
