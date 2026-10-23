@@ -31,7 +31,7 @@ export type LogLine = { s: number; d: number; ko: string; en: string }
 export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number }
 
 export type World = {
-  v: 4; over?: boolean; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
+  v: 4; over?: boolean; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
   queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
@@ -157,14 +157,14 @@ export function newWorld(setup: Setup = DEFAULT_SETUP, gen = 1, lineage: Lineage
     w.brood.push({ st: 'pupa', n: 12, dev: 0.3, prot: 0, room: w.queen.room, slave: true })
     say(w, `${sp.ko} 군락. 사무라이개미 ${st === 'young' ? 14 : 36}마리는 싸움만 하고, 훔쳐 온 곰개미 ${st === 'young' ? 30 : 80}마리가 노예로 모든 일을 한다.`, `A samurai ant colony: ${st === 'young' ? 14 : 36} samurai do nothing but fight, while ${st === 'young' ? 30 : 80} stolen wood ants do all the work as slaves.`)
   } else if (st === 'found') {
-    w.brood.push({ st: 'egg', n: 8, dev: 0.2, prot: 0, room: w.queen.room })
+    w.brood.push({ st: 'egg', n: 8, dev: 0.5, prot: 0, room: w.queen.room })
     if (sp.id === 'atta') say(w, '여왕이 입속 주머니에 담아 온 버섯 균으로 첫 정원을 차렸다.', 'The queen started the first garden with the fungus pellet she carried in her mouth pouch.')
     say(w, `${gen > 1 ? `${gen}대째. ` : ''}결혼비행을 마친 ${sp.ko} 여왕이 첫 방을 팠다. 첫 일개미 6마리와 알 8개.`, `${gen > 1 ? `Generation ${gen}. ` : ''}A ${sp.en.toLowerCase()} queen, back from her mating flight, dug her first chamber. Six first workers and eight eggs.`)
   } else if (st === 'young') {
-    w.brood.push({ st: 'larva', n: 12, dev: 0.3, prot: 12 * (0.1 + setup.majorBias), room: w.queen.room })
+    w.brood.push({ st: 'larva', n: 12, dev: 0.3, prot: 12 * (0.1 + setup.majorBias), room: w.queen.room }, { st: 'pupa', n: 6, dev: 0.8, prot: 0, room: w.queen.room }, { st: 'egg', n: 10, dev: 0.5, prot: 0, room: w.queen.room })
     say(w, `2년차 ${sp.ko} 군락. 일개미 38마리와 애벌레 12마리가 겨울을 났다.`, `A second-year ${sp.en.toLowerCase()} colony: 38 workers and 12 larvae made it through winter.`)
   } else {
-    w.brood.push({ st: 'larva', n: 24, dev: 0.35, prot: 24 * (0.12 + setup.majorBias), room: w.queen.room })
+    w.brood.push({ st: 'larva', n: 24, dev: 0.35, prot: 24 * (0.12 + setup.majorBias), room: w.queen.room }, { st: 'pupa', n: 10, dev: 0.8, prot: 1, room: w.queen.room })
     say(w, `3년차 ${sp.ko} 군락. 일개미 112, 병정 9, 애벌레 24마리가 함께 겨울을 났다.`, `A third-year ${sp.en.toLowerCase()} colony: 112 workers, 9 majors and 24 larvae made it through winter.`)
   }
   w.carb *= 1 + setup.storeBias
@@ -203,7 +203,7 @@ function digStep(w: World) {
   const nx = t.x + t.dx, ny = t.y + t.dy
   if (ny < SURF + 3 || nx < 2 || nx > W - 3 || ny > H - 4 || w.grid[idx(nx, ny)] === ROCK) { t.dx = -t.dx || 1; t.dy = rnd() < 0.5 ? 1 : 0; return false }
   t.x = nx; t.y = ny; carve(w, nx, ny)
-  if (rnd() < 0.09 && w.chambers.length < Math.min(18, 6 + Math.floor((workers(w) + majors(w)) / 40))) {
+  if (rnd() < 0.09 && w.chambers.length < Math.min(24, 6 + Math.floor((workers(w) + majors(w)) / 25))) {
     const c = { brood: 0, store: 0, waste: 0 } as Record<string, number>
     for (const ch of w.chambers) c[ch.type] = (c[ch.type] ?? 0) + 1
     const type: RoomType = (c.store ?? 0) < 1 + Math.floor(w.carb / 120) ? 'store' : (c.waste ?? 0) < 1 + Math.floor(workers(w) / 200) ? 'waste' : 'brood'
@@ -280,7 +280,7 @@ function dayTick(w: World) {
   const armyK = SP(w).bivouac ? (armyPhase(w) === 'statary' ? (w.queen.age % 34 < 7 ? 3 : 0.2) : 0) : 1
   // 늙은 여왕은 수명의 70%를 넘기면서 산란이 줄어든다
   const qy = queenYears(w), life = SP(w).life, old = qy > life * 0.7 ? clamp(1 - (qy - life * 0.7) / (life * 0.3), 0.1, 1) : 1
-  const lay = s === 3 && isWinter(w) ? 0 : (3 + Math.min(30, Wn * 0.07)) * fT * fP * fF * old * armyK * SP(w).layK * (w.queen.health / 100)
+  const lay = s === 3 && isWinter(w) ? 0 : (6 + Math.min(30, Wn * 0.08)) * fT * fP * fF * old * armyK * SP(w).layK * (w.queen.health / 100)
   if (lay > 0.15) { w.prot = Math.max(0, w.prot - lay * 0.05); const br = w.chambers.find(c => c.type === 'brood'); w.brood.push({ st: 'egg', n: lay, dev: 0, prot: 0, room: br ? br.id : w.queen.room }) }
   for (const c of w.cohorts) {
     const L = c.kind === 'm' ? 180 : 140
@@ -345,7 +345,8 @@ export function hourTick(w: World) {
   if (w.flight > 0) w.flight--
   raidHour(w)
   if (w.digQueue > 0 && !isWinter(w)) { const n = Math.min(3, w.digQueue); for (let k = 0; k < n; k++) digStep(w); w.digQueue -= n }
-  else if (!isWinter(w) && rnd() < 0.15) digStep(w)
+  else if (!isWinter(w)) { let d = 0.15 + workers(w) / 200; while (d > 0) { if (d >= 1 || rnd() < d) digStep(w); d -= 1 } }
+  w.fed = 0
   threatHour(w)
   if (w.tick % 24 === 0) dayTick(w)
 }
@@ -587,4 +588,24 @@ function guestDay(w: World) {
 export function capacity(w: World) {
   const stores = w.chambers.filter(c => c.type === 'store').length, sk = SP(w).storeK
   return { carb: (60 + stores * 90) * sk, prot: (30 + stores * 45) * sk }
+}
+
+// ---------- 내 AI 활용이 새끼를 키운다: 성공한 작업마다 육아 개미가 새끼를 먹여 발육이 빨라진다 ----------
+export function feedBrood(w: World, amt: number) {
+  if (isWinter(w)) return
+  const room = Math.max(0, 0.15 - (w.fed ?? 0)), a = Math.min(amt, room)   // 게임 1시간에 최대 0.15
+  if (a <= 0) return
+  w.fed = (w.fed ?? 0) + a
+  for (const b of w.brood) b.dev += a * (b.st === 'egg' ? 1.2 : 1)
+}
+// 다음 부화까지 남은 실제 시간(분): 가장 많이 자란 고치 기준, 내 활동 가속은 빼고 계산
+export function nextHatchMinutes(w: World) {
+  let best = Infinity
+  for (const b of w.brood) {
+    if (b.st !== 'pupa') continue
+    const c = w.chambers[b.room] ?? w.chambers[w.queen.room]!
+    const perHour = Math.max(0, tempAt(w, c.cy) - 15) / (26 * SP(w).devK) / 24
+    if (perHour > 0) best = Math.min(best, ((1 - b.dev) / perHour) * 1.25)
+  }
+  return best
 }

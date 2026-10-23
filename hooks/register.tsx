@@ -3,7 +3,7 @@ import type { Register, RenderChildren } from 'claude-code'
 
 import {
   newWorld, hourTick, moveAnts, syncAnts, sendForager, sendDigger, spawnSpider, spawnCentipede, defeatCentipede, farmFor, sendTo,
-  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid, capacity, isWinter, prettyServer,
+  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid, capacity, isWinter, prettyServer, feedBrood, nextHatchMinutes,
 } from './engine'
 import { emptyProfile, scanTranscript, scanHistory, scanSettings, pickSetup } from './profile'
 import { SPECIES, SPECIES_IDS } from './species'
@@ -215,6 +215,7 @@ export const register: Register = (on, options) => {
         if (sp) { sp.life = 0; bump('fixed'); say(w, '오류를 고쳤다. 경비 개미들이 거미줄을 끊어 냈다.', 'Error fixed. The guards cut the web down.') }
       }
       const use = classify(tool, input)
+      if (use.kind !== 'other') feedBrood(w, 0.02 * (SP(w).boost[use.kind] ?? 1))
       if (use.guessed && !w.learned[tool] && use.kind !== 'other') {
         w.learned[tool] = use.kind
         say(w, `처음 보는 도구(${tool})를 만났다. 이름으로 짐작해 일을 나눴다.`, `Met an unfamiliar tool (${tool}). The colony guessed its job from the name.`)
@@ -298,6 +299,8 @@ export const register: Register = (on, options) => {
           {sp.dulotic ? row(en ? 'Slaves (wood ants)' : '노예(곰개미)', String(Math.round(slaves(w)))) : row(T.majors, String(Math.round(majors(w))))}
           {row(en ? 'Eggs · larvae · pupae' : '알 · 애벌레 · 고치', `${Math.round(bcount(w, 'egg'))} · ${Math.round(bcount(w, 'larva'))} · ${Math.round(bcount(w, 'pupa'))}`)}
           {row(en ? 'Rooms · depth' : '방 · 깊이', `${w.chambers.length} · ${(w.deepest - 12) * 3}cm`)}
+          {(() => { const m = nextHatchMinutes(w), p = bcount(w, 'pupa'); return row(en ? 'Next hatch' : '다음 부화', p < 0.5 ? (en ? 'no pupae yet' : '고치 없음') : m === Infinity ? (en ? 'waiting for warmth' : '따뜻해지길 기다리는 중') : `${en ? '' : '고치 '}${Math.round(p)}${en ? ' pupae · ' : '개 · '}${m < 60 ? `~${Math.max(1, Math.round(m))}${en ? 'm' : '분'}` : `~${(m / 60).toFixed(1)}${en ? 'h' : '시간'}`}`) })()}
+          <Text size="caption" dimColor>{en ? 'Your work speeds this up: every successful tool call feeds the brood.' : '내가 일할수록 빨라집니다: 도구가 성공할 때마다 새끼를 먹입니다.'}</Text>
         </Box>)}
         {card(en ? 'Stores' : '비축', <Box flexDirection="column">
           {row(sp.storeKo ? (en ? sp.storeEn! : sp.storeKo) : T.carb, `${Math.round(w.carb)}/${Math.round(cap.carb)}`, bar(w.carb, cap.carb))}

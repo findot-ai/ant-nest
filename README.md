@@ -22,6 +22,7 @@ The colony's food and weather come from how you use AI. The mod never reads your
 
 | What you do in Claude Code | What happens in the nest |
 |---|---|
+| Any successful tool call | Nurses feed the brood, so it hatches faster: your work hatches ants |
 | Explore: read files, search, web research | Foragers climb trees and bring back honeydew |
 | Edit and write files | Digging: new tunnels and chambers. More storage rooms mean bigger reserves |
 | Tests or builds pass | A successful hunt: protein, which grows majors (big-headed soldiers) |
@@ -139,6 +140,7 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 | Claude Code에서 한 일 | 개미굴에서 |
 |---|---|
+| 성공한 도구 호출 전부 | 육아 개미가 새끼를 먹여 발육이 빨라진다: 내 작업이 개미를 부화시킨다 |
 | 탐색: 파일 읽기, 검색, 웹 조사 | 채집 개미가 나무에 올라 단물을 가져온다 |
 | 편집·작성 | 굴착, 새 방. 창고가 늘면 비축할 수 있는 양이 커진다 |
 | 테스트·빌드 통과 | 사냥 성공, 단백질 (병정개미가 자란다) |
