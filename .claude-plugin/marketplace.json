@@ -1,5 +1,13 @@
 {
   "name": "ant-nest",
-  "owner": { "name": "findot-ai" },
-  "plugins": [{ "name": "ant-nest", "source": "./" }]
+  "owner": {
+    "name": "findot-ai"
+  },
+  "plugins": [
+    {
+      "name": "ant-nest",
+      "source": "./"
+    }
+  ],
+  "description": "Ant Nest: a Claude Code companion colony that grows with your AI use. / 개미굴: 내 AI 활용으로 자라는 Claude Code 개미 군락."
 }

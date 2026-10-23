@@ -1,5 +1,5 @@
-import { W, H, SURF, CM, SKY, SOIL, TUN, ROCK, ROOMNAME, idx, layerOf, season, hour, chamberAt, frostDepth } from './engine'
-import type { World, Ant } from './engine'
+import { W, H, SURF, CM, SKY, SOIL, TUN, ROCK, ROOMNAME, ROOMNAME_EN, idx, layerOf, season, hour, chamberAt, frostDepth } from './engine'
+import type { World, Ant, Lang } from './engine'
 
 const SOILC = ['#563a26', '#a47646', '#805e44', '#625852']
 const ROOMC: Record<string, string> = { queen: '#805838', brood: '#705038', store: '#684e30', waste: '#463c34' }
@@ -47,7 +47,8 @@ function sprites(w: World, ants: Ant[]): Sprite[] {
 
 // ---------- 데스크톱·모바일: SVG ----------
 const S = 5
-export function svg(w: World, ants: Ant[]) {
+export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
+  const RN = lang === 'en' ? ROOMNAME_EN : ROOMNAME
   const s = season(w), nt = night(w), parts: string[] = []
   const r = (x: number, y: number, ww: number, hh: number, c: string) => parts.push(`<rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="${c}"/>`)
   r(0, 0, W * S, SURF * S, cellColor(w, 0, 0))
@@ -56,6 +57,7 @@ export function svg(w: World, ants: Ant[]) {
     const lc = LEAF[s]!
     for (let k = 0; k < 9; k++) r((t.x - 3 + (k % 3) * 2) * S - 2, (SURF - t.h - 2 + Math.floor(k / 3) * 1.4) * S, 2 * S, 1.6 * S, lc[k % 2]!)
     if (s !== 3) for (let k = 0; k < 3; k++) r(t.x * S - 3, (SURF - t.h + 3 + k) * S, 2, 2, '#6fae4a')
+    if (t.farm) parts.push(`<text x="${t.x * S}" y="${SURF * S - 4}" font-size="6" text-anchor="middle" fill="#1a2a12">${t.farm.slice(0, 14).replace(/[<>&"]/g, '')}</text>`)
   }
   for (let l = 0; l < 4; l++) { const y0 = l === 0 ? SURF : SURF + [0, 6, 22, 38][l]!, y1 = l === 3 ? H : SURF + [6, 22, 38][l]!; r(0, y0 * S, W * S, (y1 - y0) * S, SOILC[l]!) }
   r(0, SURF * S - 2, W * S, 3, s === 3 ? '#eef2f1' : s === 2 ? '#9a8a3e' : '#5f9a4a')
@@ -71,7 +73,7 @@ export function svg(w: World, ants: Ant[]) {
     }
   }
   const fd = frostDepth(w)
-  if (fd > 0) { const yy = SURF * S + (fd / CM) * S; r(0, SURF * S, W * S, yy - SURF * S, 'rgba(200,230,255,.18)'); r(0, yy, W * S, 1, '#dcefff'); parts.push(`<text x="${W * S - 3}" y="${yy - 2}" font-size="7" text-anchor="end" fill="#dcefff">동결선 ${fd}cm</text>`) }
+  if (fd > 0) { const yy = SURF * S + (fd / CM) * S; r(0, SURF * S, W * S, yy - SURF * S, 'rgba(200,230,255,.18)'); r(0, yy, W * S, 1, '#dcefff'); parts.push(`<text x="${W * S - 3}" y="${yy - 2}" font-size="7" text-anchor="end" fill="#dcefff">${lang === 'en' ? 'Frost line' : '동결선'} ${fd}cm</text>`) }
   // 새끼·먹이
   for (const sp of sprites(w, []).filter(p => p.c === '#f3ece0' || p.c === '#e2a33a' || p.c === '#c9472f')) r(sp.x * S + 1, sp.y * S + 1, 3, 3, sp.c)
   // 개미
@@ -98,8 +100,8 @@ export function svg(w: World, ants: Ant[]) {
     }
   }
   if (w.rain > 0 && s !== 3) for (let k = 0; k < 40; k++) r((k * 37 + w.tick * 13) % (W * S), (k * 23 + w.tick * 29) % (SURF * S - 4), 1, 4, 'rgba(215,232,245,.8)')
-  for (const c of w.chambers) if (c.type !== 'queen') parts.push(`<text x="${c.cx * S}" y="${(c.cy - c.ry) * S - 1}" font-size="7" text-anchor="middle" fill="#efe4d2">${ROOMNAME[c.type]}</text>`)
-  parts.push(`<text x="${q.cx * S}" y="${(q.cy - q.ry) * S - 1}" font-size="7" text-anchor="middle" fill="#e3a33b">여왕</text>`)
+  for (const c of w.chambers) if (c.type !== 'queen') parts.push(`<text x="${c.cx * S}" y="${(c.cy - c.ry) * S - 1}" font-size="7" text-anchor="middle" fill="#efe4d2">${RN[c.type]}</text>`)
+  parts.push(`<text x="${q.cx * S}" y="${(q.cy - q.ry) * S - 1}" font-size="7" text-anchor="middle" fill="#e3a33b">${lang === 'en' ? 'Queen' : '여왕'}</text>`)
   for (let d = 15; d < (H - SURF) * CM; d += 15) { const y = (SURF + d / CM) * S; parts.push(`<rect x="0" y="${y}" width="4" height="1" fill="rgba(255,255,255,.4)"/><text x="6" y="${y + 3}" font-size="6" fill="rgba(255,255,255,.5)">${d}cm</text>`) }
   if (nt > 0) r(0, 0, W * S, SURF * S, `rgba(10,12,24,${(nt * 0.18).toFixed(2)})`)
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W * S} ${H * S}" width="${W * S}" height="${H * S}" shape-rendering="crispEdges" font-family="monospace">${parts.join('')}</svg>`

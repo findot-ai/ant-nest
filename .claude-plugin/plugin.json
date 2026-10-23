@@ -1,7 +1,28 @@
 {
   "name": "ant-nest",
-  "version": "0.1.0",
-  "description": "내 AI 활용으로 자라는 개미굴. 탐색은 채집, 편집은 굴착, 테스트 통과는 사냥, 반복 오류는 천적이 된다.",
+  "version": "0.2.0",
+  "description": "An ant colony that grows with how you use AI: exploring forages, editing digs, passing tests hunts, repeated errors bring predators. / 내 AI 활용으로 자라는 개미굴: 탐색은 채집, 편집은 굴착, 테스트 통과는 사냥, 반복 오류는 천적이 된다.",
   "types": "./types/index.d.ts",
-  "license": "MIT"
+  "license": "MIT",
+  "keywords": [
+    "game",
+    "ants",
+    "simulation",
+    "companion",
+    "개미",
+    "게임"
+  ],
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Language / 언어",
+      "description": "Language for the nest's text. auto follows your system locale. / 개미굴 글자의 언어. auto는 시스템 언어를 따릅니다.",
+      "options": [
+        "auto",
+        "ko",
+        "en"
+      ],
+      "default": "auto"
+    }
+  }
 }
