@@ -3,6 +3,13 @@
 Every version of Ant Nest, newest first. Each entry is written in English, then Korean.
 개미굴의 모든 버전 기록입니다. 최신순이고, 각 항목은 영문 다음 국문입니다.
 
+## 0.14.5
+
+- Chambers also branch off other chambers, sometimes sloping down, and nearby chambers get linked by short connecting tunnels, as in real nests. Chambers are never dug into rock.
+- The History tab shows five entries per page, with Older and Newer buttons. The last 100 entries are kept.
+- 방이 갱도뿐 아니라 다른 방에서도 이어져 나가고(비스듬히 내려가기도), 가까운 방끼리는 샛길로 이어집니다. 실제 개미굴처럼요. 바위 속에는 방을 파지 않습니다.
+- 기록 탭이 5개씩 페이지로 나뉩니다. '이전 기록 ▶'으로 오래된 기록을 넘겨 보고, 최근 100개까지 보관합니다.
+
 ## 0.14.4
 
 - Digging follows real nest casts: one vertical shaft goes down from the entrance, and each new chamber hangs off it at the end of a short side tunnel (2 to 4 cells). The shaft only goes as deep as the colony is large and steps around rocks. No more tunnels wandering in every direction. Shallow chambers are flat, deep ones rounder.

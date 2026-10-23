@@ -24,12 +24,14 @@ import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
-const VERSION = '0.14.4'
+const VERSION = '0.14.5'
 const PANE = 'ant-nest'
 // 접속 75초 = 게임 1시간, 접속 30분 = 게임 하루, 약 35시간 = 게임 1년. 한 세대(여왕 수명 5~10년)는 매일 쓰면 현실 약 3개월
 const FRAME_MS = 500, FRAMES_PER_HOUR = 150
 const view = atom({ plugin: 'ant-nest', key: 'view' } as const, { frame: 0 })
 const tabAtom = atom({ plugin: 'ant-nest', key: 'tab' } as const, 'dash')
+const logPageAtom = atom({ plugin: 'ant-nest', key: 'logPage' } as const, 0)
+const LOG_PAGE = 5
 
 
 // 화면 글자: 언어별 한 벌씩
@@ -374,7 +376,7 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     await read($, view)
-    const tab = await read($, tabAtom)
+    const tab = await read($, tabAtom), logPage = await read($, logPageAtom)
     const en = lang === 'en', sp = SP(w), pop = Math.round(workers(w) + majors(w)), hr = hour(w)  // h는 JSX 함수 이름이라 쓰지 않는다
     const clock = `${hr < 12 ? T.am : T.pm} ${hr % 12 === 0 ? 12 : hr % 12}${T.hourSuffix}`
     const bar = (v: number, max: number, n = 10) => { const k = Math.max(0, Math.min(n, Math.round((v / Math.max(1, max)) * n))); return '█'.repeat(k) + '░'.repeat(n - k) }
@@ -448,14 +450,21 @@ export const register: Register = (on, options) => {
     )
     // 기록: 항목마다 칸을 나누고, 위에는 아이콘과 날짜, 아래에는 내용
     const icon = (ko: string) => /지네|거미|두더지|토너먼트에서 밀|굶|얼어|흩어/.test(ko) ? '⚠' : /버그를 잡|고쳤|쓰러뜨/.test(ko) ? '🛡' : /새 생물/.test(ko) ? '🔎' : /목초지/.test(ko) ? '🌿' : /결혼비행|갈라졌|세대|대째|여왕이 죽/.test(ko) ? '👑' : /습격|노예/.test(ko) ? '⚔' : /겨울|봄|여름|가을|우기|건기|정착기|유랑기/.test(ko) ? '🍂' : /깨어났|알을|새로 팠|방을/.test(ko) ? '🐜' : /테스트|위임|에이전트|자동화|스킬|기록/.test(ko) ? '🤖' : '·'
+    // 기록: 최신 5개씩 페이지로. 오래된 기록은 '이전 기록'으로 넘겨 본다
+    const logs = w.log.slice().reverse(), pages = Math.max(1, Math.ceil(logs.length / LOG_PAGE)), pg = Math.min(logPage, pages - 1)
     const history = (
       <Box flexDirection="column" gap={1}>
-        {w.log.slice(-20).reverse().map((l, k) => (
-          <Box key={`log-${k}`} flexDirection="column" borderStyle="round" borderDimColor={k > 0} paddingX={1}>
+        {logs.slice(pg * LOG_PAGE, (pg + 1) * LOG_PAGE).map((l, k) => (
+          <Box key={`log-${pg}-${k}`} flexDirection="column" borderStyle="round" borderDimColor={pg > 0 || k > 0} paddingX={1}>
             <Text size="caption" dimColor>{icon(l.ko)}  {en ? `${seasonName(w, l.s, 'en')} · day ${l.d}` : `${seasonName(w, l.s, 'ko')} · ${l.d}일`}</Text>
-            <Text size="footnote" dimColor={k > 2}>{en ? l.en : l.ko}</Text>
+            <Text size="footnote" dimColor={pg > 0 || k > 2}>{en ? l.en : l.ko}</Text>
           </Box>
         ))}
+        {pages > 1 && <Box flexDirection="row" gap={1} alignItems="center">
+          {pg > 0 && <Button key="log-newer" label={en ? '◀ Newer' : '◀ 최근 기록'} variant="secondary" onPress={() => update($, logPageAtom, p => Math.max(0, p - 1))} />}
+          <Text size="caption" dimColor>{pg + 1} / {pages}</Text>
+          {pg < pages - 1 && <Button key="log-older" label={en ? 'Older ▶' : '이전 기록 ▶'} variant="secondary" onPress={() => update($, logPageAtom, p => Math.min(pages - 1, p + 1))} />}
+        </Box>}
       </Box>
     )
     // 생물 도감: 생물마다 캐릭터 카드. 못 찾은 생물은 실루엣
@@ -514,7 +523,7 @@ export const register: Register = (on, options) => {
     const side = <Box flexDirection="column" gap={1}>
       {threats.map(x => <Text size="footnote" color={x.startsWith('⚠') ? 'error' : 'warning'}>{x}</Text>)}
       <Box gap={1} flexWrap="wrap">
-        {TABS.map(([k, label]) => <Button key={`tab-${k}`} label={label} variant={tab === k ? 'primary' : 'secondary'} onPress={() => update($, tabAtom, () => k)} />)}
+        {TABS.map(([k, label]) => <Button key={`tab-${k}`} label={label} variant={tab === k ? 'primary' : 'secondary'} onPress={() => { void update($, tabAtom, () => k); void update($, logPageAtom, () => 0) }} />)}
       </Box>
       {tab === 'log' ? history : tab === 'dex' ? dex : tab === 'line' ? lineage : tab === 'report' ? report : dashboard}
     </Box>

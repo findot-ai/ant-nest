@@ -34,6 +34,8 @@ test('the nest pane draws on every surface', async ($, on) => {
       for (const k of ['report', 'log', 'dex', 'line', 'dash']) { await ui.press({ key: `tab-${k}` }); expect(await ui.find({ type: 'Text' })).toBeDefined() }
       await ui.press({ key: 'tab-dex' }); expect((await ui.find({ type: 'Text', text: /발견|Found/ }))).toBeDefined()
       await ui.press({ key: 'tab-line' }); expect((await ui.find({ type: 'Text', text: /세대|Generation/ }))).toBeDefined()
+      await ui.press({ key: 'tab-log' })
+      if (await ui.find({ key: 'log-older' })) { await ui.press({ key: 'log-older' }); expect(await ui.find({ key: 'log-newer' })).toBeDefined(); expect((await ui.find({ type: 'Text', text: /^2 \/ / }))).toBeDefined() }
       await ui.press({ key: 'tab-dash' })
     }
     await ui.unmount()

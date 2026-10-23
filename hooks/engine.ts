@@ -34,7 +34,7 @@ export type Tally = { explore: number; build: number; hunt: number; raise: numbe
 export type World = {
   v: 4; over?: boolean; flightTick?: number; weekSince?: string; need?: { dig: boolean; hunt: boolean }; noteDay?: Record<string, number>; snapDate?: string; snap?: Snap; weekKey?: string; week?: Tally; lastWeek?: { key: string; tally: Tally }; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
-  queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number; len?: number; type?: RoomType }[]; shaft?: { x: number; y: number }
+  queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number; len?: number; type?: RoomType; link?: boolean }[]; shaft?: { x: number; y: number }
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
   today: Tally; total: Tally; dayKey: string
   instinct: number; trail: number; learned: Record<string, string>
@@ -92,6 +92,7 @@ function carve(w: World, x: number, y: number) {
 // 새 방이 기존 방과 겹치지 않는지 (가장자리 2칸 여유)
 function roomFree(w: World, cx: number, cy: number, rx: number, ry: number) {
   if (cx - rx < 2 || cx + rx > W - 3 || cy - ry < SURF + 3 || cy + ry > H - 4) return false
+  for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - rx; x <= cx + rx; x++) if (w.grid[idx(x, y)] === ROCK) return false   // 바위 속에는 방을 못 판다
   return w.chambers.every(c => Math.abs(c.cx - cx) > c.rx + rx + 2 || Math.abs(c.cy - cy) > c.ry + ry + 2)
 }
 function makeChamber(w: World, cx: number, cy: number, rx: number, ry: number, type: RoomType) {
@@ -192,7 +193,7 @@ export function colonyLevel(w: World) {
 
 export function say(w: World, ko: string, en: string) {
   w.log.push({ s: season(w), d: w.day, ko, en })
-  if (w.log.length > 30) w.log.shift()
+  if (w.log.length > 100) w.log.shift()   // 기록 탭에서 5개씩 넘겨 본다
 }
 
 // ---------- 굴착 ----------
@@ -215,13 +216,15 @@ function digStep(w: World) {
   if (SP(w).bivouac) return false
   w.tips = w.tips.filter(t => t.len !== undefined)   // 예전 버전의 떠도는 굴 끝은 버린다
   const t = w.tips[0]
-  // 1) 파던 곁굴을 끝까지 파고, 끝에 방을 만든다
+  // 1) 파던 곁굴을 끝까지 판다 (dy칸은 비스듬히 내려가며). 끝에 새 방을 만들거나, 이웃 방에 닿으면 그대로 이어진다
   if (t) {
-    const nx = t.x + t.dx
-    if (nx < 2 || nx > W - 3 || w.grid[idx(nx, t.y)] === ROCK) { w.tips.shift(); return false }
-    t.x = nx; carve(w, nx, t.y)
+    const nx = t.x + t.dx, ny = t.y + (t.dy > 0 ? 1 : 0)
+    if (nx < 2 || nx > W - 3 || ny > H - 4 || w.grid[idx(nx, ny)] === ROCK) { w.tips.shift(); return false }
+    if (ny !== t.y) { carve(w, t.x, ny); t.dy-- }
+    t.x = nx; t.y = ny; carve(w, nx, ny)
     if (--t.len! > 0) return false
     w.tips.shift()
+    if (t.link) return false
     const type = t.type ?? nextRoomType(w), [rx, ry] = roomSize(type, t.y), cx = t.x + t.dx * (rx + 1)
     if (!roomFree(w, cx, t.y, rx, ry)) return false
     makeChamber(w, cx, t.y, rx, ry, type)
@@ -230,17 +233,40 @@ function digStep(w: World) {
   }
   const sh = shaftOf(w), pop = workers(w) + majors(w) + slaves(w)
   const cap = Math.min(24, 6 + Math.floor(pop / 25)), maxY = Math.min(H - 5, SURF + 14 + Math.floor(pop / 6))
-  // 2) 방이 더 필요하면 갱도 옆에 곁굴 자리를 찾는다 (바위와 다른 방을 피해서)
+  // 굴이 지나갈 칸에 바위나 (출발·도착 방이 아닌) 다른 방이 없는지
+  const pathOk = (x: number, y: number, dx: number, dy: number, len: number, ok: (Chamber | undefined)[]) => {
+    for (let i = 0; i < len; i++) {
+      if (dy > 0) { y++; dy-- } x += dx
+      if (x < 2 || x > W - 3 || y > H - 4 || w.grid[idx(x, y)] === ROCK) return false
+      const c = chamberAt(w, x, y); if (c && !ok.includes(c)) return false
+    }
+    return true
+  }
+  // 2) 가끔 가까운 두 방 사이에 샛길을 낸다 (실제 굴에서도 방끼리 이어진다)
+  if (w.chambers.length >= 3 && rnd() < 0.12) {
+    for (let k = 0; k < 10; k++) {
+      let a = w.chambers[Math.floor(rnd() * w.chambers.length)]!, b = w.chambers[Math.floor(rnd() * w.chambers.length)]!
+      if (a === b) continue
+      if (a.cy > b.cy) [a, b] = [b, a]
+      const dir = b.cx > a.cx ? 1 : -1, ox = a.cx + dir * a.rx, tx = b.cx - dir * b.rx, len = Math.abs(tx - ox), dy = b.cy - a.cy
+      if (len < 2 || len > 10 || dy > len || (dir > 0 ? tx < ox : tx > ox)) continue
+      let y = a.cy, x = ox, open = true
+      for (let i = 0, d = dy; i < len; i++) { if (d > 0) { y++; d-- } x += dir; if (w.grid[idx(x, y)] !== TUN) { open = false; break } }
+      if (open || !pathOk(ox, a.cy, dir, dy, len, [a, b, undefined])) continue
+      w.tips.push({ x: ox, y: a.cy, dx: dir, dy, len, link: true })
+      return false
+    }
+  }
+  // 3) 방이 더 필요하면 곁굴 자리를 찾는다: 갱도에서, 또는 이미 있는 방에서 이어서 (바위와 다른 방을 피해서)
   if (w.chambers.length < cap) {
     const type = nextRoomType(w)
-    for (let k = 0; k < 10; k++) {
-      const y = SURF + 3 + Math.floor(rnd() * Math.max(1, sh.y - SURF - 2)), dir = rnd() < 0.5 ? -1 : 1, len = 2 + Math.floor(rnd() * 3)
-      const [rx, ry] = roomSize(type, y), cx = sh.x + dir * (len + rx + 1)
-      if (!roomFree(w, cx, y, rx, ry)) continue
-      let clear = true
-      for (let i = 1; i <= len + 2 * rx + 1; i++) if (w.grid[idx(sh.x + dir * i, y)] === ROCK) { clear = false; break }
-      if (!clear) continue
-      w.tips.push({ x: sh.x, y, dx: dir, dy: 0, len, type })
+    for (let k = 0; k < 12; k++) {
+      const fromRoom = rnd() < 0.45 ? w.chambers[Math.floor(rnd() * w.chambers.length)] : undefined, dir = rnd() < 0.5 ? -1 : 1
+      const ox = fromRoom ? fromRoom.cx + dir * fromRoom.rx : sh.x, oy = fromRoom ? fromRoom.cy : SURF + 3 + Math.floor(rnd() * Math.max(1, sh.y - SURF - 2))
+      const drop = rnd() < (fromRoom ? 0.6 : 0.25) ? 1 + Math.floor(rnd() * 3) : 0, len = drop + 2 + Math.floor(rnd() * 3)
+      const ey = oy + drop, [rx, ry] = roomSize(type, ey), cx = ox + dir * (len + rx + 1)
+      if (!roomFree(w, cx, ey, rx, ry) || !pathOk(ox, oy, dir, drop, len + 1, [fromRoom, undefined])) continue
+      w.tips.push({ x: ox, y: oy, dx: dir, dy: drop, len, type })
       return false
     }
   } else if (rnd() > 0.3) return false
