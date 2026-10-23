@@ -46,65 +46,201 @@ function sprites(w: World, ants: Ant[]): Sprite[] {
 }
 
 // ---------- 데스크톱·모바일: SVG ----------
-const S = 5
+// 같은 색 사각형을 path 하나로 묶어 글자 수를 줄인다. 층(layer)마다 그리는 순서를 지킨다.
+const S = 6
+class Painter {
+  layers: Map<string, string[]>[] = []
+  extra: string[][] = []
+  constructor(n: number) { for (let k = 0; k < n; k++) { this.layers.push(new Map()); this.extra.push([]) } }
+  rect(l: number, x: number, y: number, w: number, h: number, c: string) {
+    if (w <= 0 || h <= 0) return
+    const m = this.layers[l]!; let a = m.get(c); if (!a) { a = []; m.set(c, a) }
+    a.push(`M${+x.toFixed(1)} ${+y.toFixed(1)}h${+w.toFixed(1)}v${+h.toFixed(1)}h${-w.toFixed(1)}z`)
+  }
+  raw(l: number, svg: string) { this.extra[l]!.push(svg) }
+  out() {
+    let o = ''
+    this.layers.forEach((m, k) => { m.forEach((d, c) => { o += `<path fill="${c}" d="${d.join('')}"/>` }); o += this.extra[k]!.join('') })
+    return o
+  }
+}
+const hash = (x: number, y: number) => { let h = (x * 374761393 + y * 668265263) >>> 0; h = ((h ^ (h >>> 13)) * 1274126177) >>> 0; return (h >>> 8) / 16777216 }
+const SOILD = ['#4a3020', '#8e6339', '#6e5038', '#544b46'], SOILL = ['#644230', '#b5865a', '#8c6a4f', '#6c625c']
+const L_BG = 0, L_TERR = 1, L_EDGE = 2, L_ITEM = 3, L_ANT = 4, L_FX = 5, L_TXT = 6
+
 export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
   const RN = lang === 'en' ? ROOMNAME_EN : ROOMNAME
-  const s = season(w), nt = night(w), parts: string[] = []
-  const r = (x: number, y: number, ww: number, hh: number, c: string) => parts.push(`<rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="${c}"/>`)
-  r(0, 0, W * S, SURF * S, cellColor(w, 0, 0))
-  for (const t of w.trees) {
-    r(t.x * S - 2, (SURF - t.h) * S, 5, t.h * S, mix('#4a3324', '#000000', nt * 0.4))
-    const lc = LEAF[s]!
-    for (let k = 0; k < 9; k++) r((t.x - 3 + (k % 3) * 2) * S - 2, (SURF - t.h - 2 + Math.floor(k / 3) * 1.4) * S, 2 * S, 1.6 * S, lc[k % 2]!)
-    if (s !== 3) for (let k = 0; k < 3; k++) r(t.x * S - 3, (SURF - t.h + 3 + k) * S, 2, 2, '#6fae4a')
-    if (t.farm) parts.push(`<text x="${t.x * S}" y="${SURF * S - 4}" font-size="6" text-anchor="middle" fill="#1a2a12">${t.farm.slice(0, 14).replace(/[<>&"]/g, '')}</text>`)
+  const s = season(w), nt = night(w), h = hour(w), P = new Painter(7), WW = W * S, HH = H * S, GY = SURF * S
+  const defs: string[] = []
+  // 하늘
+  const top = mix(w.rain > 0 ? '#6d7c86' : ['#8ec5d6', '#6fb3dc', '#c9b48e', '#aeb9c0'][s]!, '#0e1430', nt * 0.85)
+  const bot = mix(w.rain > 0 ? '#a3adb0' : ['#e6efd8', '#d9eef2', '#ecd9b0', '#dfe5e8'][s]!, '#1e2440', nt * 0.75)
+  defs.push(`<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bot}"/></linearGradient>`)
+  P.raw(L_BG, `<rect width="${WW}" height="${GY}" fill="url(#sky)"/>`)
+  if (nt > 0.5) for (let k = 0; k < 26; k++) P.rect(L_BG, Math.floor(hash(k, 1) * WW), Math.floor(hash(k, 2) * (GY - 30)), 1, 1, hash(k, 3) > 0.7 ? '#ffffff' : '#c8d0f0')
+  // 해와 달: 시각에 따라 하늘을 가로지른다
+  const dayP = (h - 6) / 13, nightP = ((h + 24 - 19) % 24) / 11
+  if (w.rain <= 0) {
+    if (dayP >= 0 && dayP <= 1) { const sx = dayP * (WW - 30) + 10, sy = 34 - Math.sin(dayP * Math.PI) * 26; P.rect(L_BG, sx, sy, 10, 10, s === 1 ? '#ffe27a' : '#fff0b0'); P.rect(L_BG, sx - 2, sy + 2, 14, 6, s === 1 ? '#ffe27a' : '#fff0b0'); P.rect(L_BG, sx + 2, sy - 2, 6, 14, s === 1 ? '#ffe27a' : '#fff0b0') }
+    else if (nightP <= 1) { const mx = nightP * (WW - 30) + 10, my = 30 - Math.sin(nightP * Math.PI) * 20; P.rect(L_BG, mx, my, 8, 8, '#eef0d8'); P.rect(L_BG, mx + 3, my - 1, 6, 6, top) }
   }
-  for (let l = 0; l < 4; l++) { const y0 = l === 0 ? SURF : SURF + [0, 6, 22, 38][l]!, y1 = l === 3 ? H : SURF + [6, 22, 38][l]!; r(0, y0 * S, W * S, (y1 - y0) * S, SOILC[l]!) }
-  r(0, SURF * S - 2, W * S, 3, s === 3 ? '#eef2f1' : s === 2 ? '#9a8a3e' : '#5f9a4a')
-  // 굴과 바위: 같은 색이 이어지는 가로 구간을 한 사각형으로
+  // 구름
+  for (let k = 0; k < 3; k++) {
+    const cx = ((hash(k, 9) * WW + w.tick * (0.3 + k * 0.15)) % (WW + 60)) - 30, cy = 12 + k * 14
+    const cc = w.rain > 0 ? mix('#8a959c', '#000000', nt * 0.5) : mix('#ffffff', '#5a6080', nt * 0.7)
+    P.rect(L_BG, cx, cy, 30, 6, cc); P.rect(L_BG, cx + 6, cy - 4, 16, 5, cc); P.rect(L_BG, cx + 4, cy + 6, 22, 2, mix(cc, '#000000', 0.08))
+  }
+  // 땅 위 풀
+  const grass = s === 3 ? ['#e9eeec', '#ffffff'] : s === 2 ? ['#8f8340', '#a69a4c'] : s === 0 ? ['#6fae4e', '#8cc66a'] : ['#3f8a3e', '#56a24a']
+  P.rect(L_TERR, 0, GY - 3, WW, 3, grass[0]!)
+  for (let x = 0; x < WW; x += 3) { const hh = 2 + Math.floor(hash(x, 7) * 6); if (w.grid[idx(Math.floor(x / S), SURF)] === TUN) continue; P.rect(L_TERR, x, GY - 3 - hh, 2, hh, grass[hash(x, 8) > 0.5 ? 1 : 0]!) }
+  if (s < 2) for (let k = 0; k < 10; k++) { const x = Math.floor(hash(k, 11) * WW); if (w.grid[idx(Math.floor(x / S), SURF)] === TUN) continue; P.rect(L_ITEM, x, GY - 9, 3, 3, s === 0 ? (k % 2 ? '#f4b6c8' : '#fff3a8') : '#f3d34a'); P.rect(L_ITEM, x + 1, GY - 6, 1, 3, grass[0]!) }
+  // 나무: 둥근 수관을 줄마다 다른 폭으로
+  const leaf = s === 0 ? ['#7fbf5c', '#a2d47c', '#5f9e46'] : s === 1 ? ['#2f7a3c', '#47944c', '#235f2e'] : s === 2 ? ['#c26f2a', '#dd9a3e', '#9a5322'] : ['#7a5a42', '#8d6a4e', '#5e4434']
+  for (const t of w.trees) {
+    const bx = t.x * S, trunkTop = GY - t.h * S
+    P.rect(L_TERR, bx - 3, trunkTop, 7, t.h * S, mix('#5a3d29', '#000000', nt * 0.4)); P.rect(L_TERR, bx - 3, trunkTop, 2, t.h * S, mix('#704c33', '#000000', nt * 0.4))
+    P.rect(L_TERR, bx + 4, trunkTop + 14, 8, 3, '#5a3d29'); P.rect(L_TERR, bx - 11, trunkTop + 8, 8, 3, '#5a3d29')
+    const R = t.farm ? 3 : 4, cy = trunkTop - 2
+    for (let r = -R; r <= R; r++) {
+      const half = Math.round(Math.sqrt(R * R - r * r) * 1.3 + 0.5)
+      for (let c = -half; c <= half; c++) {
+        const shade = r < -R / 3 && c < 0 ? 1 : r > R / 3 || c > half - 2 ? 2 : 0
+        P.rect(L_TERR, bx + c * 4 - 2, cy + r * 4, 4, 4, mix(leaf[shade]!, '#081020', nt * 0.45))
+      }
+    }
+    if (s === 3) for (let c = -R; c <= R; c++) P.rect(L_ITEM, bx + c * 4 - 2, cy - R * 4 - 1, 4, 2, '#f4f7f6')
+    if (s === 0) for (let k = 0; k < 6; k++) P.rect(L_ITEM, bx - 12 + Math.floor(hash(t.x, k) * 24), cy - 10 + Math.floor(hash(k, t.x) * 18), 3, 3, '#f8cdd8')
+    if (s === 2 && t.x % 2 === 0) for (let k = 0; k < 4; k++) P.rect(L_ITEM, bx - 10 + k * 6, cy - 2 + (k % 2) * 6, 3, 3, '#e8642c')
+    if (s !== 3) for (let k = 0; k < 4; k++) P.rect(L_ITEM, bx + (k % 2 ? 2 : -4), GY - (t.h - 2 - k) * S, 2, 2, '#7fd45a')
+  }
+  // 흙: 층마다 질감 패턴
+  const bands = [[0, 6], [6, 22], [22, 38], [38, H - SURF]]
+  bands.forEach(([a, b], l) => {
+    defs.push(`<pattern id="soil${l}" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="${SOILC[l]}"/><path fill="${SOILD[l]}" d="M3 5h2v2h-2zM15 2h3v2h-3zM9 14h2v2h-2zM20 17h2v3h-2zM5 20h3v1h-3z"/><path fill="${SOILL[l]}" d="M11 4h1v1h-1zM18 10h2v1h-2zM2 12h1v2h-1zM14 21h2v1h-2z"/></pattern>`)
+    P.raw(L_BG, `<rect x="0" y="${(SURF + a!) * S}" width="${WW}" height="${(b! - a!) * S}" fill="url(#soil${l})"/>`)
+    if (l > 0) P.rect(L_BG, 0, (SURF + a!) * S, WW, 1, SOILD[l]!)
+  })
+  // 나무뿌리
+  for (const t of w.trees) for (let k = 0; k < 3; k++) { let x = t.x * S, y = GY; for (let n = 0; n < 9; n++) { x += (k - 1) * 3 + (hash(t.x * 3 + k, n) - 0.5) * 6; y += 4; P.rect(L_BG, x, y, 2, 4, '#3b2a1c') } }
+  // 바위와 굴: 칸마다 위아래 이웃을 보고 명암을 준다
+  const at = (x: number, y: number) => (x < 0 || x >= W || y < 0 || y >= H ? SOIL : w.grid[idx(x, y)]!)
   for (let y = SURF; y < H; y++) {
     let x = 0
     while (x < W) {
-      const c = w.grid[idx(x, y)]
+      const c = at(x, y)
       if (c !== TUN && c !== ROCK) { x++; continue }
-      const col = cellColor(w, x, y); let x2 = x + 1
-      while (x2 < W && (w.grid[idx(x2, y)] === TUN || w.grid[idx(x2, y)] === ROCK) && cellColor(w, x2, y) === col) x2++
-      r(x * S, y * S, (x2 - x) * S, S, col); x = x2
+      const col = c === ROCK ? '#7c776f' : cellColor(w, x, y); let x2 = x + 1
+      while (x2 < W && at(x2, y) === c && (c === ROCK || cellColor(w, x2, y) === col)) x2++
+      P.rect(L_TERR, x * S, y * S, (x2 - x) * S, S, col)
+      for (let k = x; k < x2; k++) {
+        if (c === ROCK) {
+          if (at(k, y - 1) !== ROCK) P.rect(L_EDGE, k * S, y * S, S, 2, '#a39d93')
+          if (at(k, y + 1) !== ROCK) P.rect(L_EDGE, k * S, y * S + S - 2, S, 2, '#58534d')
+          if (hash(k, y) > 0.8) P.rect(L_EDGE, k * S + 2, y * S + 2, 2, 1, '#69645d')
+        } else {
+          if (at(k, y - 1) === SOIL) P.rect(L_EDGE, k * S, y * S, S, 2, 'rgba(0,0,0,.35)')
+          if (at(k, y + 1) === SOIL) P.rect(L_EDGE, k * S, y * S + S - 2, S, 2, 'rgba(255,220,170,.18)')
+          if (at(k - 1, y) === SOIL) P.rect(L_EDGE, k * S, y * S, 1, S, 'rgba(0,0,0,.25)')
+          if (at(k + 1, y) === SOIL) P.rect(L_EDGE, k * S + S - 1, y * S, 1, S, 'rgba(0,0,0,.25)')
+        }
+      }
+      x = x2
     }
   }
+  // 방 안쪽의 은은한 빛
+  defs.push('<radialGradient id="glow"><stop offset="0" stop-color="#ffdca0" stop-opacity=".22"/><stop offset="1" stop-color="#ffdca0" stop-opacity="0"/></radialGradient>')
+  for (const c of w.chambers) if (c.type !== 'waste') P.raw(L_EDGE, `<ellipse cx="${c.cx * S + S / 2}" cy="${c.cy * S + S / 2}" rx="${(c.rx + 1) * S}" ry="${(c.ry + 1) * S}" fill="url(#glow)"/>`)
+  // 동결선
   const fd = frostDepth(w)
-  if (fd > 0) { const yy = SURF * S + (fd / CM) * S; r(0, SURF * S, W * S, yy - SURF * S, 'rgba(200,230,255,.18)'); r(0, yy, W * S, 1, '#dcefff'); parts.push(`<text x="${W * S - 3}" y="${yy - 2}" font-size="7" text-anchor="end" fill="#dcefff">${lang === 'en' ? 'Frost line' : '동결선'} ${fd}cm</text>`) }
-  // 새끼·먹이
-  for (const sp of sprites(w, []).filter(p => p.c === '#f3ece0' || p.c === '#e2a33a' || p.c === '#c9472f')) r(sp.x * S + 1, sp.y * S + 1, 3, 3, sp.c)
-  // 개미
-  for (const a of ants) {
-    const y = a.st === 'out' ? (SURF - 1 - a.up) * S + 1 : a.y * S + 1, x = a.x * S
-    const body = a.job === 'swarm' ? '#2a0d06' : a.kind === 'm' ? '#3a2214' : '#120b07'
-    r(x, y + 1, 3, 2, body); r(x + 3, y, a.kind === 'm' ? 3 : 2, a.kind === 'm' ? 3 : 2, body)
-    if (a.job === 'swarm') r(x + 3, y - 1, 2, 1, '#ff5a3c')
-    if (a.carry) r(x + 4, y - 2, 2, 2, a.carry === 2 ? '#c9472f' : '#e2a33a')
+  if (fd > 0) { const yy = GY + (fd / CM) * S; P.rect(L_FX, 0, GY, WW, yy - GY, 'rgba(200,230,255,.16)'); for (let x = 0; x < WW; x += 8) P.rect(L_FX, x, yy, 5, 1, '#dcefff') }
+  // 새끼: 방마다 알·애벌레·고치 모양을 달리
+  const per: Record<number, { egg: number; larva: number; pupa: number }> = {}
+  for (const b of w.brood) { const r = (per[b.room] ??= { egg: 0, larva: 0, pupa: 0 }); r[b.st] += b.n }
+  for (const id in per) {
+    const c = w.chambers[+id]; if (!c) continue
+    const r = per[id]!, floor = (c.cy + c.ry) * S + S - 2, x0 = (c.cx - c.rx + 1) * S, span = (c.rx * 2 - 1) * S
+    const nE = Math.min(12, Math.ceil(r.egg / 3)), nL = Math.min(8, Math.ceil(r.larva / 4)), nP = Math.min(8, Math.ceil(r.pupa / 4))
+    for (let k = 0; k < nE; k++) P.rect(L_ITEM, x0 + ((k * 5) % span), floor - 3 - Math.floor(k / Math.max(1, span / 5)) * 2, 2, 2, '#fbf7ee')
+    for (let k = 0; k < nL; k++) { const x = x0 + span - 6 - ((k * 7) % span), y = floor - 4 - (k % 2) * 3; P.rect(L_ITEM, x, y, 4, 3, '#f1e6cc'); P.rect(L_ITEM, x + 3, y, 1, 1, '#c9b48e') }
+    for (let k = 0; k < nP; k++) { const x = x0 + ((k * 6 + 3) % span), y = floor - 6; P.rect(L_ITEM, x, y, 3, 5, '#d2aa74'); P.rect(L_ITEM, x, y + 4, 3, 1, '#a07e4e') }
   }
-  const q = w.chambers[w.queen.room]!
-  r(q.cx * S - 4, q.cy * S + 1, 6, 3, '#120b07'); r(q.cx * S + 2, q.cy * S + 1, 3, 3, '#7a3b1f'); r(q.cx * S + 5, q.cy * S + 1, 3, 3, '#120b07')
+  // 창고와 쓰레기 방
+  for (const c of w.chambers) {
+    const floor = (c.cy + c.ry) * S + S - 2, x0 = (c.cx - c.rx) * S + 2, span = (c.rx * 2 + 1) * S - 4
+    if (c.type === 'store') {
+      const nC = Math.min(14, Math.round(w.carb / 20)), nP = Math.min(8, Math.round(w.prot / 15))
+      for (let k = 0; k < nC; k++) { const x = x0 + ((k * 7) % span), y = floor - 3 - Math.floor((k * 7) / span) * 3; P.rect(L_ITEM, x, y, 3, 3, '#e8a838'); P.rect(L_ITEM, x, y, 1, 1, '#fff0b8') }
+      for (let k = 0; k < nP; k++) P.rect(L_ITEM, x0 + span - 4 - ((k * 9) % span), floor - 3 - (k % 2) * 2, 4, 2, '#b2442c')
+    } else if (c.type === 'waste') for (let k = 0; k < 6; k++) P.rect(L_ITEM, x0 + ((k * 5) % span), floor - 2 - (k % 2), 2, 2, k % 3 ? '#6d6258' : '#8a7e70')
+  }
+  // 개미: 머리·가슴·배 세 마디, 다리는 프레임마다 번갈아
+  const flip = w.tick % 2
+  for (const [i, a] of ants.entries()) {
+    const f = a.f ?? 1, out = a.st === 'out', climbing = out && a.up > 0
+    const body = a.job === 'swarm' ? '#2b0e07' : a.kind === 'm' ? '#3a2214' : '#140c08'
+    if (climbing) {
+      const x = a.x * S + (i % 2 ? 4 : -2), y = GY - 6 - a.up * S
+      P.rect(L_ANT, x + 1, y, 2, 2, body); P.rect(L_ANT, x + 1, y + 2, 2, 1, body); P.rect(L_ANT, x, y + 3, 4, 3, body)
+      P.rect(L_ANT, x - 1, y + 1 + flip, 1, 1, body); P.rect(L_ANT, x + 4, y + 2 - flip, 1, 1, body)
+      if (a.carry) P.rect(L_FX, x + 1, y - 2, 2, 2, a.carry === 2 ? '#c9472f' : '#e8a838')
+      continue
+    }
+    const y = out ? GY - 6 : a.y * S + 1, x = a.x * S
+    const g = f > 0 ? x : x + 3, th = f > 0 ? x + 3 : x + 1, hd = f > 0 ? x + 5 : x - 1
+    const big = a.kind === 'm'
+    P.rect(L_ANT, g, y + 1, 3, 3, body); P.rect(L_ANT, th, y + 1, 2, 2, body)
+    P.rect(L_ANT, big ? (f > 0 ? hd : hd - 1) : hd, big ? y - 1 : y, big ? 3 : 2, big ? 3 : 2, body)
+    P.rect(L_ANT, f > 0 ? hd + (big ? 3 : 2) : hd - 1, y - 1, 1, 1, body)
+    for (let k = 0; k < 3; k++) P.rect(L_ANT, x + 1 + k * 2 + ((k + flip) % 2), y + 4, 1, 1, body)
+    if (a.job === 'swarm') P.rect(L_FX, hd, y - 2, 2, 1, '#ff5a3c')
+    if (a.carry) P.rect(L_FX, f > 0 ? hd + 1 : hd - 2, y - 2, 3, 2, a.carry === 2 ? '#c9472f' : '#e8a838')
+  }
+  // 여왕: 크고 날개 자국이 있다
+  const q = w.chambers[w.queen.room]!, qx = q.cx * S - 6, qy = (q.cy + q.ry) * S - 3
+  P.rect(L_ANT, qx, qy, 8, 5, '#140c08'); P.rect(L_ANT, qx + 1, qy, 6, 1, '#3a2418'); P.rect(L_ANT, qx + 8, qy + 1, 4, 3, '#5a2a14'); P.rect(L_ANT, qx + 12, qy, 3, 3, '#140c08')
+  P.rect(L_ANT, qx + 9, qy - 2, 3, 2, 'rgba(230,220,200,.5)'); P.rect(L_ANT, qx + 15, qy - 1, 1, 1, '#140c08')
+  for (let k = 0; k < 3; k++) P.rect(L_ANT, qx + 7 + k * 2 + ((k + flip) % 2), qy + 5, 1, 1, '#140c08')
   // 천적
   for (const t of w.threats) {
     if (t.k === 'spider') {
-      const x = t.x * S, y = (SURF - 4) * S
-      for (let k = 0; k < 4; k++) { r(x - 6 + k * 4, y - 2, 1, 16, 'rgba(245,245,240,.55)'); r(x - 7, y + k * 4, 16, 1, 'rgba(245,245,240,.55)') }
-      r(x, y + 5, 4, 4, '#1d1a17'); r(x + 1, y + 6, 2, 1, '#c9472f')
+      const cx = t.x * S + 3, cy = GY - 22
+      let lines = ''
+      for (let k = 0; k < 8; k++) { const an = (k / 8) * Math.PI * 2; lines += `M${cx} ${cy}l${(Math.cos(an) * 13).toFixed(1)} ${(Math.sin(an) * 13).toFixed(1)}` }
+      P.raw(L_FX, `<path d="${lines}" stroke="rgba(245,245,240,.6)" stroke-width=".6" fill="none"/><circle cx="${cx}" cy="${cy}" r="5" stroke="rgba(245,245,240,.45)" stroke-width=".6" fill="none"/><circle cx="${cx}" cy="${cy}" r="9" stroke="rgba(245,245,240,.35)" stroke-width=".6" fill="none"/><path d="M${cx} ${GY - 35}V${cy}" stroke="rgba(245,245,240,.5)" stroke-width=".5"/>`)
+      P.rect(L_FX, cx - 2, cy - 1, 4, 4, '#1d1a17'); P.rect(L_FX, cx - 1, cy - 3, 2, 2, '#1d1a17'); P.rect(L_FX, cx - 1, cy + 1, 2, 1, '#c9472f')
+      for (const d of [-1, 1]) for (let k = 0; k < 3; k++) P.rect(L_FX, cx + (d < 0 ? -5 : 2), cy - 1 + k * 2, 3, 1, '#1d1a17')
     } else {
-      for (const [x, y] of t.trail) r(x * S, y * S + 1, 5, 3, '#b5452c')
-      r(t.x * S, t.y * S + 1, 5, 3, '#6e2316')
-      parts.push(`<circle cx="${t.x * S + 2}" cy="${t.y * S + 2}" r="${t.alarmR * S * 0.6}" fill="none" stroke="rgba(222,106,76,.35)"/>`)
-      r(t.x * S - 2, t.y * S - 4, 9, 2, '#de6a4c'); r(t.x * S - 2, t.y * S - 4, Math.max(1, Math.round((9 * t.hp) / t.hp0)), 1, '#2a1a12')
+      const segs: [number, number][] = [[t.x, t.y], ...t.trail]
+      segs.forEach(([sx, sy], k) => {
+        const x = sx * S, y = sy * S + 1
+        P.rect(L_FX, x, y, 6, 4, k === 0 ? '#5e1d12' : k % 2 ? '#b5452c' : '#9c3a24'); P.rect(L_FX, x + 1, y, 4, 1, '#d8643f')
+        P.rect(L_FX, x, y + 4 + flip, 1, 1, '#e0b35a'); P.rect(L_FX, x + 5, y + 5 - flip, 1, 1, '#e0b35a'); P.rect(L_FX, x, y - 1 - flip, 1, 1, '#e0b35a')
+      })
+      P.rect(L_FX, t.x * S - 2, t.y * S - 1, 2, 1, '#e0b35a'); P.rect(L_FX, t.x * S + 6, t.y * S - 1, 2, 1, '#e0b35a')
+      P.raw(L_FX, `<circle cx="${t.x * S + 3}" cy="${t.y * S + 3}" r="${(t.alarmR * S * 0.55).toFixed(1)}" fill="none" stroke="rgba(255,90,60,.4)" stroke-dasharray="3 3"/>`)
+      P.rect(L_TXT, t.x * S - 4, t.y * S - 7, 14, 3, '#2a1a12'); P.rect(L_TXT, t.x * S - 4, t.y * S - 7, Math.max(1, Math.round((14 * t.hp) / t.hp0)), 3, '#de6a4c')
     }
   }
-  if (w.rain > 0 && s !== 3) for (let k = 0; k < 40; k++) r((k * 37 + w.tick * 13) % (W * S), (k * 23 + w.tick * 29) % (SURF * S - 4), 1, 4, 'rgba(215,232,245,.8)')
-  for (const c of w.chambers) if (c.type !== 'queen') parts.push(`<text x="${c.cx * S}" y="${(c.cy - c.ry) * S - 1}" font-size="7" text-anchor="middle" fill="#efe4d2">${RN[c.type]}</text>`)
-  parts.push(`<text x="${q.cx * S}" y="${(q.cy - q.ry) * S - 1}" font-size="7" text-anchor="middle" fill="#e3a33b">${lang === 'en' ? 'Queen' : '여왕'}</text>`)
-  for (let d = 15; d < (H - SURF) * CM; d += 15) { const y = (SURF + d / CM) * S; parts.push(`<rect x="0" y="${y}" width="4" height="1" fill="rgba(255,255,255,.4)"/><text x="6" y="${y + 3}" font-size="6" fill="rgba(255,255,255,.5)">${d}cm</text>`) }
-  if (nt > 0) r(0, 0, W * S, SURF * S, `rgba(10,12,24,${(nt * 0.18).toFixed(2)})`)
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W * S} ${H * S}" width="${W * S}" height="${H * S}" shape-rendering="crispEdges" font-family="monospace">${parts.join('')}</svg>`
+  // 비와 눈
+  if (w.rain > 0 && s !== 3) for (let k = 0; k < 50; k++) P.rect(L_FX, (k * 37 + w.tick * 13) % WW, (k * 23 + w.tick * 29) % (GY - 4), 1, 5, 'rgba(215,232,245,.75)')
+  if (s === 3) for (let k = 0; k < 40; k++) P.rect(L_FX, (k * 41 + w.tick * 3) % WW, (k * 19 + w.tick * 5) % (GY - 4), 2, 2, 'rgba(255,255,255,.85)')
+  if (nt > 0) P.rect(L_FX, 0, 0, WW, GY, `rgba(8,10,28,${(nt * 0.22).toFixed(2)})`)
+  // 글자: 배경 상자를 깔고, 겹치면 생략
+  const boxes: [number, number, number, number][] = []
+  const label = (text: string, cx: number, y: number, fg: string, bg: string) => {
+    const wdt = text.length * 4.4 + 6, x = Math.max(2, Math.min(WW - wdt - 2, cx - wdt / 2))
+    if (boxes.some(([bx, by, bw, bh]) => x < bx + bw && x + wdt > bx && y - 8 < by + bh && y + 2 > by)) return
+    boxes.push([x, y - 8, wdt, 10])
+    P.raw(L_TXT, `<rect x="${x.toFixed(1)}" y="${y - 8}" width="${wdt.toFixed(1)}" height="10" rx="2" fill="${bg}"/><text x="${(x + wdt / 2).toFixed(1)}" y="${y}" font-size="7.5" text-anchor="middle" fill="${fg}">${text.replace(/[<>&"]/g, '')}</text>`)
+  }
+  label(lang === 'en' ? 'Queen' : '여왕', q.cx * S + 3, (q.cy - q.ry) * S - 2, '#1a120a', '#e3a33b')
+  for (const c of w.chambers) if (c.type !== 'queen') label(RN[c.type], c.cx * S + 3, (c.cy - c.ry) * S - 2, '#efe4d2', 'rgba(20,14,10,.72)')
+  for (const t of w.trees) if (t.farm) label(t.farm.slice(0, 14), t.x * S, GY + 10, '#eaf5df', 'rgba(30,60,30,.8)')
+  if (fd > 0) label(`${lang === 'en' ? 'Frost line' : '동결선'} ${fd}cm`, WW - 40, GY + (fd / CM) * S - 2, '#0b1a2a', 'rgba(220,240,255,.9)')
+  // 깊이 눈금
+  for (let d = 15; d < (H - SURF) * CM; d += 15) { const y = (SURF + d / CM) * S; P.rect(L_TXT, 0, y, 4, 1, 'rgba(255,255,255,.45)'); P.raw(L_TXT, `<text x="6" y="${y + 3}" font-size="6" fill="rgba(255,255,255,.55)">${d}cm</text>`) }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WW} ${HH}" width="${WW}" height="${HH}" shape-rendering="crispEdges" font-family="monospace"><defs>${defs.join('')}</defs>${P.out()}</svg>`
 }
 
 // ---------- 터미널: 반 블록(▀) 한 글자에 위아래 두 칸 ----------

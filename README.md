@@ -14,7 +14,7 @@
 
 **English** · [한국어](#한국어) · [Show your colony](https://github.com/findot-ai/ant-nest/issues/new?template=show-your-colony.yml)
 
-A colony of Japanese carpenter ants (*Camponotus japonicus*) lives beside your Claude Code session. While you are connected, 2 seconds is one game hour: seasons turn, brood grows with soil temperature, and the frost line creeps down in winter. Think of it as a Tamagotchi for your AI workflow, built on real ant ecology.
+A colony of Japanese carpenter ants (*Camponotus japonicus*) lives beside your Claude Code session. Time runs only while you are connected: one hour connected is one game day, and about 70 hours is a game year, so with everyday use a year passes in roughly a month. Seasons turn, brood grows with soil temperature, and the frost line creeps down in winter. Think of it as a Tamagotchi for your AI workflow, built on real ant ecology.
 
 The colony's food and weather come from how you use AI. The mod never reads your code or conversation. It looks only at tool names and whether each call succeeded.
 
@@ -80,7 +80,7 @@ The desktop app draws the nest as pixel art in a side pane. A terminal draws it 
 
 <p align="center"><img src="docs/nest-ko.png" width="360" alt="개미굴: 지네가 침입하고 거미줄이 쳐진 개미 군락 단면 도트 그림"></p>
 
-Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 접속해 있는 동안 2초가 게임 1시간이고, 계절이 바뀌고, 새끼가 땅속 온도에 따라 자라고, 겨울에는 동결선이 내려옵니다.
+Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간은 접속해 있을 때만 흐릅니다. 접속 1시간이 게임 하루, 약 70시간이 게임 1년이라 매일 쓰면 대략 한 달에 1년이 지납니다. 계절이 바뀌고, 새끼가 땅속 온도에 따라 자라고, 겨울에는 동결선이 내려옵니다.
 
 군락의 먹이와 날씨는 당신의 AI 활용입니다. 코드나 대화 내용은 읽지 않고, 도구 이름과 성공 여부만 봅니다.
 

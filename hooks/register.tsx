@@ -10,7 +10,8 @@ import { svg, raster } from './render'
 import { classify, colonyType, isTestLike } from './usage'
 
 const PANE = 'ant-nest'
-const FRAME_MS = 500, FRAMES_PER_HOUR = 4
+// 접속 2.5분 = 게임 1시간, 접속 1시간 = 게임 하루, 약 70시간 = 게임 1년
+const FRAME_MS = 500, FRAMES_PER_HOUR = 300
 const view = atom({ plugin: 'ant-nest', key: 'view' } as const, { frame: 0 })
 
 
@@ -56,7 +57,7 @@ export const register: Register = (on, options) => {
   let frame = 0, hourGain = 0, lastStatus = '', paneNote = '-'
 
   const bump = (k: keyof Tally) => { w.today[k]++; w.total[k]++ }
-  const gain = (n: number) => { const g = Math.max(0, Math.min(n, 30 - hourGain)); hourGain += g; return g }
+  const gain = (n: number) => { const g = Math.max(0, Math.min(n, 8 - hourGain)); hourGain += g; return g }
   // 상태줄에 새로 쓸 글이 있으면 돌려준다
   const statusText = () => {
     const pop = Math.round(workers(w) + majors(w))
@@ -157,11 +158,11 @@ export const register: Register = (on, options) => {
         say(w, `처음 보는 도구(${tool})를 만났다. 이름으로 짐작해 일을 나눴다.`, `Met an unfamiliar tool (${tool}). The colony guessed its job from the name.`)
       }
       switch (use.kind) {
-        case 'explore': bump('explore'); w.carb += gain(2 * (1 + w.trail * 0.2)); sendForager(w, ants, 1); break
-        case 'build': bump('build'); w.digQueue += 6; sendDigger(w, ants); break
-        case 'hunt': bump('hunt'); w.prot += gain(5); sendForager(w, ants, 2); say(w, '테스트가 통과했다. 사냥조가 곤충을 끌고 돌아온다.', 'Tests passed. The hunting party drags an insect home.'); break
-        case 'raise': bump('raise'); w.brood.push({ st: 'egg', n: 3, dev: 0, prot: 0, room: w.queen.room }); say(w, '일을 나눠 맡겼다. 여왕이 알을 더 낳았다.', 'Work was delegated. The queen laid extra eggs.'); break
-        case 'mcp': { bump('mcp'); const t = farmFor(w, use.server ?? 'mcp'); w.carb += gain(3); sendTo(w, ants, t.x, t.h, 1); break }
+        case 'explore': bump('explore'); w.carb += gain(0.35 * (1 + w.trail * 0.2)); sendForager(w, ants, 1); break
+        case 'build': bump('build'); w.digQueue = Math.min(40, w.digQueue + 1); sendDigger(w, ants); break
+        case 'hunt': bump('hunt'); w.prot += gain(1.5); sendForager(w, ants, 2); say(w, '테스트가 통과했다. 사냥조가 곤충을 끌고 돌아온다.', 'Tests passed. The hunting party drags an insect home.'); break
+        case 'raise': bump('raise'); w.brood.push({ st: 'egg', n: 1, dev: 0, prot: 0, room: w.queen.room }); say(w, '일을 나눠 맡겼다. 여왕이 알을 더 낳았다.', 'Work was delegated. The queen laid extra eggs.'); break
+        case 'mcp': { bump('mcp'); const t = farmFor(w, use.server ?? 'mcp'); w.carb += gain(0.5); sendTo(w, ants, t.x, t.h, 1); break }
         case 'skill': {
           bump('skill'); const before = Math.floor(w.trail); w.trail = Math.min(3, w.trail + 0.3)
           if (Math.floor(w.trail) > before) say(w, '익힌 방법(스킬)을 다시 썼다. 페로몬 길이 짙어져 채집이 빨라진다.', 'A learned method (skill) was reused. The pheromone trail grows stronger and foraging speeds up.')
@@ -172,13 +173,13 @@ export const register: Register = (on, options) => {
           if (use.setup) { w.instinct = Math.min(10, w.instinct + 1); say(w, '자동화를 걸어 두었다. 개미들이 스스로 하는 일(본능)이 늘었다.', 'Automation was set up. The ants now do more on instinct, even without you.') }
           else w.instinct = Math.min(10, w.instinct + 0.1)
           break
-        case 'plan': bump('plan'); w.digQueue += 2; w.carb += gain(1); break
+        case 'plan': bump('plan'); w.digQueue = Math.min(40, w.digQueue + 1); w.carb += gain(0.2); break
         case 'parallel':
           bump('parallel'); for (let k = 0; k < 4; k++) sendForager(w, ants, k === 0 ? 2 : 1)
-          w.brood.push({ st: 'egg', n: 2, dev: 0, prot: 0, room: w.queen.room })
+          w.brood.push({ st: 'egg', n: 1, dev: 0, prot: 0, room: w.queen.room })
           say(w, '여러 에이전트를 동시에 보냈다. 원정대가 줄지어 굴을 나선다.', 'Several agents went out at once. An expedition files out of the nest.')
           break
-        default: if (tool === 'Bash') w.carb += gain(1)
+        default: if (tool === 'Bash') w.carb += gain(0.2)
       }
     }
     const st = statusText(); if (st) $.ui.status(st)
@@ -200,7 +201,7 @@ export const register: Register = (on, options) => {
       picture = <Raster key="nest" {...raster(w, ants)} />
     } else if (e.surface === 'desktop' || e.surface === 'mobile' || e.surface === 'vscode') {
       const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
-      picture = <Svg source={svg(w, ants, lang)} alt={T.alt(pop)} width={240} height={320} />
+      picture = <Svg source={svg(w, ants, lang)} alt={T.alt(pop)} width={288} height={384} />
     }
     return (
       <Box flexDirection="column">

@@ -15,7 +15,7 @@ export type RoomType = 'queen' | 'brood' | 'store' | 'waste'
 export type Chamber = { id: number; cx: number; cy: number; rx: number; ry: number; type: RoomType }
 export type Brood = { st: Stage; n: number; dev: number; prot: number; room: number }
 export type Cohort = { age: number; n: number; kind: 'w' | 'm' }
-export type Ant = { x: number; y: number; kind: 'w' | 'm'; job: 'idle' | 'forage' | 'dig' | 'guard' | 'swarm'; st: 'in' | 'out'; tx: number; carry: 0 | 1 | 2; t: number; climb: number; up: number }
+export type Ant = { x: number; y: number; kind: 'w' | 'm'; job: 'idle' | 'forage' | 'dig' | 'guard' | 'swarm'; st: 'in' | 'out'; tx: number; carry: 0 | 1 | 2; t: number; climb: number; up: number; f?: number }
 export type Threat = { k: 'spider' | 'centipede'; x: number; y: number; hp: number; hp0: number; life: number; tool?: string; trail: [number, number][]; alarmR: number; ate: number }
 export type LogLine = { s: number; d: number; ko: string; en: string }
 export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number }
@@ -66,6 +66,11 @@ function carve(w: World, x: number, y: number) {
   if (!inb(x, y) || y < SURF) return false
   const i = idx(x, y); if (w.grid[i] === ROCK) return false
   w.grid[i] = TUN; if (y > w.deepest) w.deepest = y; return true
+}
+// 새 방이 기존 방과 겹치지 않는지 (가장자리 2칸 여유)
+function roomFree(w: World, cx: number, cy: number, rx: number, ry: number) {
+  if (cx - rx < 2 || cx + rx > W - 3 || cy - ry < SURF + 3 || cy + ry > H - 4) return false
+  return w.chambers.every(c => Math.abs(c.cx - cx) > c.rx + rx + 2 || Math.abs(c.cy - cy) > c.ry + ry + 2)
 }
 function makeChamber(w: World, cx: number, cy: number, rx: number, ry: number, type: RoomType) {
   const id = w.chambers.length
@@ -126,7 +131,9 @@ function digStep(w: World) {
     for (const ch of w.chambers) c[ch.type] = (c[ch.type] ?? 0) + 1
     const type: RoomType = (c.store ?? 0) < 1 + Math.floor(w.carb / 120) ? 'store' : (c.waste ?? 0) < 1 + Math.floor(workers(w) / 200) ? 'waste' : 'brood'
     const rx = type === 'waste' ? 2 : 3, ry = type === 'waste' ? 1 : 2
-    makeChamber(w, t.x + (t.dx >= 0 ? rx + 1 : -rx - 1), t.y, rx, ry, type)
+    const cx = t.x + (t.dx >= 0 ? rx + 1 : -rx - 1)
+    if (!roomFree(w, cx, t.y, rx, ry)) return false
+    makeChamber(w, cx, t.y, rx, ry, type)
     say(w, `지하 ${(t.y - SURF) * CM}cm에 ${ROOMNAME[type]}을 새로 팠다.`, `Dug a new ${ROOMNAME_EN[type].toLowerCase()} chamber ${(t.y - SURF) * CM}cm down.`)
     if (w.tips.length < 4) w.tips.push({ x: t.x, y: t.y, dx: -t.dx || 1, dy: 1 })
     return true
@@ -313,23 +320,28 @@ export function moveAnts(w: World, ants: Ant[]) {
   const s = season(w), cen = w.threats.find(t => t.k === 'centipede'), spider = w.threats.find(t => t.k === 'spider')
   const ex = entranceX(w), qr = w.chambers[w.queen.room]!
   for (const a of ants) {
+    const ox = a.x
+    moveOne(a)
+    if (a.x !== ox) a.f = a.x > ox ? 1 : -1
+  }
+  function moveOne(a: Ant) {
     if (a.st === 'out') {
       // 나무에 오르내리기: up이 지금 높이, climb이 진딧물이 있는 높이
-      if (!a.carry && a.x === a.tx) { if (a.up < a.climb) { a.up++; continue } a.carry = a.t as 1 | 2; continue }
-      if (a.carry && a.up > 0) { a.up--; continue }
+      if (!a.carry && a.x === a.tx) { if (a.up < a.climb) { a.up++; return } a.carry = a.t as 1 | 2; return }
+      if (a.carry && a.up > 0) { a.up--; return }
       const goal = a.carry ? ex : a.tx
-      if (spider && a.x === spider.x && rnd() < 0.12) { const old = w.cohorts.filter(c => c.kind === 'w').sort((x, y) => y.age - x.age)[0]; if (old) old.n = Math.max(0, old.n - 1); say(w, '채집 개미 한 마리가 거미줄에 걸렸다.', 'A forager got caught in the web.'); a.st = 'in'; a.job = 'idle'; a.x = qr.cx; a.y = qr.cy; a.carry = 0; continue }
+      if (spider && a.x === spider.x && rnd() < 0.12) { const old = w.cohorts.filter(c => c.kind === 'w').sort((x, y) => y.age - x.age)[0]; if (old) old.n = Math.max(0, old.n - 1); say(w, '채집 개미 한 마리가 거미줄에 걸렸다.', 'A forager got caught in the web.'); a.st = 'in'; a.job = 'idle'; a.x = qr.cx; a.y = qr.cy; a.carry = 0; return }
       if (a.x !== goal) a.x += Math.sign(goal - a.x)
       else { a.st = 'in'; a.y = SURF; a.job = 'idle'; a.carry = 0 }
-      continue
+      return
     }
     if (w.grid[idx(a.x, a.y)] !== TUN) { a.x = qr.cx; a.y = qr.cy }
-    if (s === 3) { step(w, a, qr.cx + Math.round((rnd() - 0.5) * qr.rx * 2), qr.cy, 0.8); continue }
-    if (cen && (a.kind === 'm' || Math.abs(a.x - cen.x) + Math.abs(a.y - cen.y) <= cen.alarmR)) { a.job = 'swarm'; step(w, a, cen.x, cen.y, 0.97); continue }
+    if (s === 3) { step(w, a, qr.cx + Math.round((rnd() - 0.5) * qr.rx * 2), qr.cy, 0.8); return }
+    if (cen && (a.kind === 'm' || Math.abs(a.x - cen.x) + Math.abs(a.y - cen.y) <= cen.alarmR)) { a.job = 'swarm'; step(w, a, cen.x, cen.y, 0.97); return }
     if (a.job === 'swarm') a.job = a.kind === 'm' ? 'guard' : 'idle'
-    if (a.job === 'forage') { if (a.y <= SURF) { a.st = 'out'; a.y = SURF - 1 } else step(w, a, ex, SURF, 0.9); continue }
-    if (a.job === 'dig') { const t = w.tips[0]; if (t) step(w, a, t.x, t.y, 0.8); if (--a.t <= 0) a.job = 'idle'; continue }
-    if (a.job === 'guard') { step(w, a, ex + Math.round((rnd() - 0.5) * 3), SURF + 3, 0.6); continue }
+    if (a.job === 'forage') { if (a.y <= SURF) { a.st = 'out'; a.y = SURF - 1 } else step(w, a, ex, SURF, 0.9); return }
+    if (a.job === 'dig') { const t = w.tips[0]; if (t) step(w, a, t.x, t.y, 0.8); if (--a.t <= 0) a.job = 'idle'; return }
+    if (a.job === 'guard') { step(w, a, ex + Math.round((rnd() - 0.5) * 3), SURF + 3, 0.6); return }
     const rooms = w.chambers.filter(c => c.type !== 'waste'), r = rooms[(a.x * 7 + a.y) % rooms.length]!
     step(w, a, r.cx + Math.round((rnd() - 0.5) * r.rx * 2), r.cy, rnd() < 0.5 ? 0.6 : 0.1)
   }
