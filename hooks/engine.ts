@@ -2,6 +2,8 @@
 // 1 tick = 게임 1시간. 계절 21일(겨울 7일). 시작 규모와 종은 설치 시점의 사용 패턴으로 정한다.
 import { SPECIES } from './species'
 import type { SpeciesId, Species } from './species'
+import { guestsFor, guestById, RARITY_KO, RARITY_EN } from './guests'
+import type { GuestId } from './guests'
 export const W = 48, H = 64, SURF = 12, CM = 3
 export const SKY = 0, SOIL = 1, TUN = 2, ROCK = 3
 export const SEASONS = ['봄', '여름', '가을', '겨울']
@@ -29,7 +31,7 @@ export type LogLine = { s: number; d: number; ko: string; en: string }
 export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number }
 
 export type World = {
-  v: 4; over?: boolean; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
+  v: 4; over?: boolean; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
   queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
@@ -118,7 +120,7 @@ export function newWorld(setup: Setup = DEFAULT_SETUP, gen = 1, lineage: Lineage
     queen: { room: 0, home: 0, health: 100, age: st === 'found' ? 0 : st === 'young' ? YEAR_DAYS : YEAR_DAYS * 2 },
     deepest: SURF, tips: [], digQueue: 0, rain: 0,
     threats: [], streak: {}, log: [], today: emptyTally(), total: emptyTally(), dayKey: '',
-    instinct: setup.instinct, trail: setup.trail, learned: {},
+    instinct: setup.instinct, trail: setup.trail, learned: {}, guests: [], dex: {}, newDex: [],
   }
   for (let y = 0; y < SURF; y++) for (let x = 0; x < W; x++) w.grid[idx(x, y)] = SKY
   const nx = 16 + Math.floor(rnd() * 16)
@@ -176,7 +178,7 @@ export function nextGeneration(w: World): World {
   const succ = w.alates > 0
   const lineage = [...w.lineage, { gen: w.gen, species: w.species, years: Math.round(queenYears(w) * 10) / 10, peak: Math.round(w.peak), fixed: w.total.fixed, ended: succ ? 'succession' : 'collapse' } as Lineage]
   const nw = newWorld({ ...DEFAULT_SETUP, species: w.species, stage: succ && SP(w).succession === 'fission' ? 'young' : 'found', farms: w.trees.filter(t => t.farm).map(t => t.farm!), instinct: w.instinct * 0.5 }, succ ? w.gen + 1 : 1, lineage)
-  nw.total = { ...w.total }; nw.learned = w.learned
+  nw.total = { ...w.total }; nw.learned = w.learned; nw.dex = w.dex
   return nw
 }
 
@@ -294,6 +296,7 @@ function dayTick(w: World) {
     const r = w.chambers[w.queen.room]!
     if (tempAt(w, r.cy) < 0.5) { for (const c of w.cohorts) c.n *= 0.985; say(w, '동결선이 겨울방까지 내려왔다. 얼어 죽는 개미가 생긴다.', 'The frost line reached the winter chamber. Some ants froze.') }
   }
+  guestDay(w)
   // 여왕의 나이, 결혼비행, 수명
   w.queen.age++
   const pop = workers(w) + majors(w); if (pop > w.peak) w.peak = pop
@@ -521,4 +524,31 @@ function tournament(w: World, pop: number) {
       say(w, '토너먼트에서 밀렸다. 이웃 군락이 쳐들어와 여왕을 죽이고 새끼와 꿀단지를 빼앗아 갔다.', 'We lost the tournament. The neighbors raided us, killed the queen, and took the brood and repletes.')
     } else say(w, '토너먼트에서 밀렸다. 이웃 군락이 쳐들어와 새끼 절반과 꿀단지를 빼앗아 갔다. 여왕은 살아남았다.', 'We lost the tournament. The neighbors raided us and took half the brood and our repletes. The queen survived.')
   } else say(w, '이웃 군락과 다리를 세우고 몸을 부풀리는 과시 싸움(토너먼트)을 벌였다. 승부가 나지 않아 서로 물러났다.', 'A display tournament with a neighbor colony: stilt-walking and puffing up. Neither side gave way.')
+}
+
+// ---------- 개미집 손님: 종마다 함께 사는 생물이 희귀도에 따라 찾아온다. 도감은 세대를 넘어 이어진다 ----------
+const GUEST_P = [0, 0.07, 0.025, 0.01, 0.003]
+function guestDay(w: World) {
+  const pop = workers(w) + majors(w), calls = Object.values(w.today).reduce((a, b) => a + b, 0)
+  const boost = (pop > 80 ? 1 : pop > 25 ? 0.6 : 0.25) * (calls > 30 ? 1.6 : calls > 5 ? 1.2 : 1)
+  for (const g of w.guests) {
+    g.days--
+    const def = guestById(g.id)
+    if (def.effect === 'drain') w.carb = Math.max(0, w.carb - 0.6)
+    else if (def.effect === 'brood') { const b = w.brood.find(x => x.n > 1); if (b) b.n -= 0.5 }
+    else if (def.effect === 'honeydew') w.carb += 1.2
+  }
+  w.guests = w.guests.filter(g => g.days > 0)
+  if (isWinter(w) || w.guests.length >= 3) return
+  for (const def of guestsFor(w.species)) {
+    if (w.guests.some(g => g.id === def.id) || rnd() > GUEST_P[def.rarity]! * boost) continue
+    let x = 0, y = 0
+    if (def.surface) { const t = w.trees[Math.floor(rnd() * w.trees.length)]!; x = t.x; y = SURF - t.h + 2 }
+    else { const c = w.chambers[Math.floor(rnd() * w.chambers.length)]!; x = c.cx + Math.floor((rnd() - 0.5) * c.rx); y = c.cy + c.ry }
+    w.guests.push({ id: def.id, x, y, days: 4 + Math.floor(rnd() * 6) })
+    const d = w.dex[def.id]
+    if (!d) { w.dex[def.id] = { n: 1, first: epName(w.ep, 'ko', w) }; w.newDex.push(def.id) } else d.n++
+    say(w, `손님이 찾아왔다: ${def.ko} (${RARITY_KO[def.rarity]}). ${def.koDesc}`, `A guest arrived: ${def.en} (${RARITY_EN[def.rarity]}). ${def.enDesc}`)
+    break
+  }
 }

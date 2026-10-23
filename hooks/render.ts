@@ -242,6 +242,20 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
     }
     P.rect(L_TERR, WW - 14, GY - 7, 14, 7, '#8a6a46'); P.rect(L_TERR, WW - 10, GY - 9, 8, 2, '#8a6a46')
   }
+  // 개미집 손님
+  for (const g of w.guests) {
+    const x = g.x * S, y = g.y * S + 1
+    switch (g.id) {
+      case 'cricket': P.rect(L_ANT, x, y + 1, 5, 3, '#8a6a42'); P.rect(L_ANT, x + 5, y, 1, 1, '#8a6a42'); P.rect(L_ANT, x + 6, y - 1, 2, 1, '#8a6a42'); P.rect(L_ANT, x - 1, y + 4, 2, 1, '#6e5232'); break
+      case 'rove': P.rect(L_ANT, x, y + 2, 7, 2, '#1c1410'); P.rect(L_ANT, x + 1, y + 1, 2, 1, '#6a3a1c'); break
+      case 'lycaenid': P.rect(L_ANT, x, y + 1, 6, 3, '#9bc46a'); P.rect(L_ANT, x + 1, y + 1, 4, 1, '#c4e29a'); break
+      case 'niphanda': P.rect(L_ANT, x, y + 1, 6, 3, '#d8c8a8'); P.rect(L_ANT, x + 1, y + 1, 4, 1, '#efe4cc'); P.rect(L_FX, x - 1, y - 2, 8, 1, 'rgba(255,215,90,.8)'); break
+      case 'attaphila': P.rect(L_ANT, x, y + 2, 3, 2, '#c49a5a'); break
+      case 'antbird': P.rect(L_FX, x - 4, y, 8, 5, '#3a3a3a'); P.rect(L_FX, x + 3, y - 2, 4, 3, '#1e1e1e'); P.rect(L_FX, x + 7, y - 1, 2, 1, '#d8d0a0'); P.rect(L_FX, x - 6, y + 1, 3, 2, '#2a2a2a'); break
+      case 'silverfish': P.rect(L_ANT, x, y + 2, 6, 2, '#b8c0c8'); P.rect(L_ANT, x + 6, y + 2, 2, 1, '#8a9298'); break
+      case 'gynandro': P.rect(L_ANT, x, y + 1, 3, 3, '#140c08'); P.rect(L_ANT, x + 3, y + 1, 2, 2, '#7a3a1a'); P.rect(L_ANT, x + 5, y, 2, 2, '#b84a1e'); P.rect(L_FX, x - 1, y - 2, 8, 1, 'rgba(255,215,90,.8)'); break
+    }
+  }
   // 결혼비행: 날개 달린 신여왕과 수개미가 하늘을 난다
   if (w.flight > 0) for (let k = 0; k < 14; k++) {
     const x = (hash(k, 21) * WW + w.tick * (2 + k % 3) + k * 13) % WW, y = 8 + ((hash(k, 22) * (GY - 30) + w.tick * 3 * (k % 2 ? 1 : -1)) % (GY - 30) + GY) % (GY - 30)

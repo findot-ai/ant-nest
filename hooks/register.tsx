@@ -7,6 +7,8 @@ import {
 } from './engine'
 import { emptyProfile, scanTranscript, scanHistory, scanSettings, pickSetup } from './profile'
 import { SPECIES, SPECIES_IDS } from './species'
+import { GUESTS, RARITY_KO, RARITY_EN, guestById } from './guests'
+import type { GuestId } from './guests'
 import type { SpeciesId } from './species'
 import type { World, Ant, Tally, Lang, LogLine } from './engine'
 import { svg, raster } from './render'
@@ -100,7 +102,7 @@ export const register: Register = (on, options) => {
     ants = []; syncAnts(w, ants)
     // 사람 없이 돌아가는 세션(-p, SDK, 예약 실행)은 자동화다
     if (!e.isInteractive) { w.instinct = Math.min(10, w.instinct + 0.5); bump('auto') }
-    await $.command.register({ name: 'ant', description: '개미굴 창 열기 / Open the ant nest (reset: 새 군락 new colony, stats: 활용 기록 usage log)' })
+    await $.command.register({ name: 'ant', description: '개미굴 / Ant nest — stats · dex(도감) · species · new <종> · gift(선물 코드) · adopt <code> · card(프로필 카드) · reset' })
     const opened = await $.ui.open({ id: PANE, title: T.title })
     paneNote = opened.isPlaced ? 'placed' : opened.reason
     $.clock.every(FRAME_MS, () => {
@@ -108,6 +110,7 @@ export const register: Register = (on, options) => {
       moveAnts(w, ants)
       if (frame % FRAMES_PER_HOUR === 0) {
         hourTick(w); hourGain = 0
+        for (const id of w.newDex.splice(0)) { const g = guestById(id as GuestId); $.ui.toast(lang === 'en' ? `🐜 New in your dex: ${g.en} (${RARITY_EN[g.rarity]})` : `🐜 도감 등록: ${g.ko} (${RARITY_KO[g.rarity]})`) }
         if (w.over) { const succ = w.alates > 0; w = nextGeneration(w); ants = []; syncAnts(w, ants); $.ui.toast(succ ? T.succession : T.collapse); void $.store.set('world', w) }
         if (w.tick % 24 === 0) { syncAnts(w, ants); void $.store.set('world', w) }
       }
@@ -151,6 +154,29 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'ant' }, async ($, e) => {
     const arg = e.args.trim()
+    if (arg === 'dex') {
+      const rows = GUESTS.map(g => { const d = w.dex[g.id]; const host = g.hosts === 'all' ? (lang === 'en' ? 'any species' : '모든 종') : g.hosts.map(spName).join(', ')
+        return d ? `✔ ${lang === 'en' ? g.en : g.ko} (${g.sci}) · ${lang === 'en' ? RARITY_EN[g.rarity] : RARITY_KO[g.rarity]} · ×${d.n} · ${lang === 'en' ? g.enDesc : g.koDesc}` : `？ ${'?'.repeat(4)} · ${lang === 'en' ? RARITY_EN[g.rarity] : RARITY_KO[g.rarity]} · ${lang === 'en' ? 'lives with' : '사는 곳'}: ${host}` })
+      return { text: `${lang === 'en' ? 'Guest dex' : '개미집 손님 도감'} ${Object.keys(w.dex).length}/${GUESTS.length}\n${rows.join('\n')}` }
+    }
+    if (arg === 'gift') {
+      const code = giftCode(w.species, w.gen, colonyLevel(w))
+      return { text: lang === 'en' ? `Gift code for a queen of your bloodline (${spName(w.species)}, gen ${w.gen}, Lv${colonyLevel(w)}):\n${code}\nA friend runs /ant adopt ${code} to start a colony with her. No money, just ants.` : `내 혈통 여왕 선물 코드 (${spName(w.species)} · ${w.gen}대 · Lv${colonyLevel(w)}):\n${code}\n친구가 /ant adopt ${code} 를 입력하면 이 여왕으로 군락을 시작합니다. 돈은 오가지 않습니다.` }
+    }
+    if (arg.startsWith('adopt')) {
+      const g = readGift(arg.slice(5).trim())
+      if (!g) return { text: lang === 'en' ? 'That gift code is not valid.' : '올바른 선물 코드가 아닙니다.' }
+      const dex = w.dex, total = w.total, learned = w.learned
+      w = newWorld({ species: g.species, stage: 'found', farms: w.trees.filter(t => t.farm).map(t => t.farm!), trail: 0, instinct: 0, majorBias: 0, storeBias: 0, ko: '', en: '' }, 1, w.lineage)
+      w.dex = dex; w.total = total; w.learned = learned; w.gift = arg.slice(5).trim()
+      say(w, `선물받은 여왕이 첫 방을 팠다. ${g.gen}대째 혈통, 레벨 ${g.lv} 군락에서 왔다.`, `The gifted queen dug her first chamber. She comes from a generation-${g.gen}, level-${g.lv} colony.`)
+      ants = []; syncAnts(w, ants); await $.store.set('world', w)
+      return { text: lang === 'en' ? `Adopted a ${spName(g.species)} queen.` : `${spName(g.species)} 여왕을 입양했습니다.` }
+    }
+    if (arg === 'card') {
+      await $.fs.write('ant-nest-card.svg', card(w, lang))
+      return { text: lang === 'en' ? 'Wrote ant-nest-card.svg in this folder. Commit it to your GitHub profile repository and add:\n![My ant colony](ant-nest-card.svg)' : '이 폴더에 ant-nest-card.svg를 만들었습니다. GitHub 프로필 저장소에 올리고 README에 이 줄을 넣으세요:\n![내 개미 군락](ant-nest-card.svg)' }
+    }
     if (arg === 'species') return { text: `${T.speciesList}\n` + SPECIES_IDS.map(id => `${id} · ${spName(id)} (${SPECIES[id].sci}): ${lang === 'en' ? SPECIES[id].enDesc : SPECIES[id].koDesc}`).join('\n') }
     if (arg.startsWith('new')) {
       const id = arg.slice(3).trim() as SpeciesId
@@ -254,9 +280,36 @@ export const register: Register = (on, options) => {
         <Text dimColor>{stats}</Text>
         <Text>{usage}</Text>
         <Text dimColor>{T.more(t)} · {T.type}: {colonyType(w.total, lang)}</Text>
+        <Text dimColor>{lang === 'en' ? 'Guest dex' : '손님 도감'} {Object.keys(w.dex).length}/{GUESTS.length}{w.guests.length ? ` · ${lang === 'en' ? 'Visiting' : '방문 중'}: ${w.guests.map(g => (lang === 'en' ? guestById(g.id).en : guestById(g.id).ko)).join(', ')}` : ''}</Text>
         {w.log.slice(-3).map(l => <Text dimColor>{line(l)}</Text>)}
         {season(w) === 3 && <Text dimColor>{T.winter}</Text>}
       </Box>
     )
   })
+}
+
+// ---------- 선물 코드: 종·세대·레벨에 검사 글자를 붙인다 (손으로 바꾸기 어렵게만) ----------
+function chk(t: string) { let h = 7; for (const ch of t) h = (h * 31 + ch.charCodeAt(0)) % 1679616; return h.toString(36).toUpperCase().padStart(4, '0') }
+function giftCode(sp: SpeciesId, gen: number, lv: number) { const body = `${SPECIES_IDS.indexOf(sp)}${gen.toString(36)}-${lv.toString(36)}`.toUpperCase(); return `ANT-${body}-${chk(body + 'nest')}` }
+function readGift(code: string): { species: SpeciesId; gen: number; lv: number } | null {
+  const m = /^ANT-(\d)([0-9A-Z]+)-([0-9A-Z]+)-([0-9A-Z]{4})$/.exec(code.toUpperCase())
+  if (!m || chk(`${m[1]}${m[2]}-${m[3]}` + 'nest') !== m[4]) return null
+  const species = SPECIES_IDS[+m[1]!]; if (!species) return null
+  return { species, gen: parseInt(m[2]!, 36), lv: parseInt(m[3]!, 36) }
+}
+
+// ---------- 프로필 카드 SVG ----------
+function card(w: World, lang: Lang) {
+  const sp = SP(w), pop = Math.round(workers(w) + majors(w)), esc = (t: string) => t.replace(/[<>&"]/g, '')
+  const name = esc(lang === 'en' ? sp.en : sp.ko), type = esc(colonyType(w.total, lang).split(':')[0]!)
+  const dots = Array.from({ length: 22 }, (_, k) => `<rect x="${300 + (k * 37) % 160}" y="${66 + ((k * 23) % 48)}" width="5" height="3" fill="${k % 6 ? sp.body : sp.major}"/>`).join('')
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="140" viewBox="0 0 480 140" font-family="monospace" shape-rendering="crispEdges">
+<rect width="480" height="140" rx="10" fill="#1f1914"/><rect y="52" width="480" height="88" rx="0" fill="#5a3d28"/><rect y="52" width="480" height="4" fill="#5f9a4a"/>
+<rect x="296" y="62" width="168" height="58" rx="10" fill="#3a2818"/>${dots}
+<text x="18" y="30" font-size="18" fill="#efe4d2">🐜 Ant Nest · ${name}</text>
+<text x="18" y="46" font-size="11" fill="#a6978a">${esc(sp.sci)} · ${lang === 'en' ? `Gen ${w.gen}` : `${w.gen}대`} · Lv${colonyLevel(w)}</text>
+<text x="18" y="80" font-size="26" fill="#ffe7b0">${pop}</text><text x="18" y="96" font-size="11" fill="#e8d8c0">${lang === 'en' ? 'ants' : '마리'} · ${type}</text>
+<text x="18" y="118" font-size="11" fill="#e8d8c0">${lang === 'en' ? 'Bugs fixed' : '고친 버그'} ${w.total.fixed} · ${lang === 'en' ? 'Dex' : '도감'} ${Object.keys(w.dex).length}/${GUESTS.length}</text>
+<text x="18" y="132" font-size="9" fill="#a6978a">github.com/findot-ai/ant-nest</text>
+</svg>`
 }

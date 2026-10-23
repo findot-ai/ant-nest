@@ -40,7 +40,9 @@ The colony's food and weather come from how you use AI. The mod never reads your
 
 Over time your usage pattern gives the colony a type: Scout, Builder, Hunter, Delegator, Herder (MCP-heavy), Trailblazer (skill-heavy) or Instinct (automation-heavy).
 
-The colony never dies from your work. The queen can weaken, but idle days are just quiet days.
+All graphics are drawn by the plugin's own code as pixel art; no AI image generation is used.
+
+Bugs never wipe the colony out on their own: they bring predators you can beat by fixing them. But colonies age. A queen dies of old age, a samurai colony starves without raids, a honeypot colony can lose a tournament. Carry your line on through nuptial flights.
 
 ## Your colony starts from your history
 
@@ -69,6 +71,17 @@ Only the 15 most recent conversation files under 4 MB are read.
 
 `/ant species` lists them; `/ant new <species>` starts a new colony with one (for example `/ant new atta`).
 
+## Guest dex
+
+Real ant nests host lodgers. Depending on your species, guests drop in: ant crickets that beg food, rove beetles that steal brood, blue butterfly caterpillars that pay in honeydew, the legendary *Niphanda fusca* caterpillar that grows only in Japanese carpenter ant nests, the tiny roach of leafcutter gardens, antbirds that follow army ant raids, and the extremely rare gynandromorph ant, born half female and half male. They come in four rarities, and your dex carries over across generations and species. `/ant dex` shows what you have found.
+
+## Gift a queen, show your card
+
+- `/ant gift` makes a code for a queen of your bloodline. A friend runs `/ant adopt <code>` to start a colony with her. No money changes hands.
+- `/ant card` writes `ant-nest-card.svg` for your GitHub profile README.
+
+<p align="center"><img src="docs/card-ko.png" width="420" alt="Profile card: species, generation, level, ant count, colony type, bugs fixed, dex progress"></p>
+
 ## Generations and colony level
 
 A queen lives 5 to 10 game years depending on the species. Once the colony is big enough, winged queens and males leave on a nuptial flight in early summer. When the old queen dies, one of those young queens founds the next generation. If no flight ever happened, the colony scatters and a stranger queen settles the empty ground.
@@ -83,6 +96,9 @@ Run `/ant stats`, take a screenshot, and post it with the [Show your colony](htt
 
 - `/ant`: open the nest pane
 - `/ant stats`: your usage so far, colony type, tools learned
+- `/ant dex`: the guest dex
+- `/ant gift` · `/ant adopt <code>`: gift a queen, adopt one
+- `/ant card`: write your profile card
 - `/ant species`: list the species
 - `/ant new <species>`: start a new colony with that species
 - `/ant reset`: start over from scratch
@@ -141,7 +157,9 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 쓰는 패턴이 쌓이면 군락 유형이 정해집니다: 정찰형, 건축형, 사냥형, 분업형, 목축형(MCP 위주), 길잡이형(스킬 위주), 본능형(자동화 위주).
 
-일 때문에 군락이 전멸하지는 않습니다. 여왕은 약해질 수 있지만, 쉬는 날은 조용히 지나갈 뿐입니다.
+모든 그림은 플러그인 코드가 직접 그리는 도트이고, AI 이미지 생성은 쓰지 않습니다.
+
+버그만으로 군락이 전멸하지는 않습니다. 버그는 천적을 부르고, 고치면 물리칠 수 있습니다. 하지만 군락은 늙습니다. 여왕은 수명이 다하면 죽고, 사무라이개미는 습격이 멈추면 굶고, 꿀단지개미는 토너먼트에서 지면 털릴 수 있습니다. 결혼비행으로 혈통을 이어 가세요.
 
 ## 내 기록으로 시작하는 군락
 
@@ -170,6 +188,25 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 `/ant species`로 목록을 보고, `/ant new <종>`으로 그 종의 새 군락을 시작합니다(예: `/ant new atta`).
 
+## 개미집 손님 도감
+
+실제 개미집에는 더부살이 손님이 삽니다. 종에 따라 이런 손님이 찾아옵니다.
+
+- 먹이를 얻어먹는 개미집귀뚜라미
+- 새끼를 훔쳐 먹는 개미반날개
+- 단물로 값을 치르는 부전나비 애벌레
+- 일본왕개미 둥지에서만 자라는 전설의 담흑부전나비 애벌레
+- 잎꾼개미 정원의 작은 바퀴
+- 군대개미 행렬을 따라다니는 개미새
+- 몸 절반은 암컷, 절반은 수컷인 아주 드문 암수한몸 개미
+
+희귀도는 네 단계이고, 도감은 세대와 종을 바꿔도 이어집니다. `/ant dex`로 봅니다.
+
+## 여왕 선물하기, 군락 카드
+
+- `/ant gift`로 내 혈통 여왕의 선물 코드를 만들고, 친구가 `/ant adopt <코드>`로 그 여왕의 군락을 시작합니다. 돈은 오가지 않습니다.
+- `/ant card`로 GitHub 프로필 README에 붙일 `ant-nest-card.svg`를 만듭니다.
+
 ## 세대와 군락 레벨
 
 여왕은 종에 따라 5~10 게임년을 삽니다. 군락이 충분히 크면 초여름에 날개 달린 신여왕과 수개미가 결혼비행을 나가고, 늙은 여왕이 죽으면 그중 하나가 다음 세대를 엽니다. 결혼비행을 한 번도 못 했다면 군락은 흩어지고, 빈 땅에 낯선 여왕이 내려앉습니다.
@@ -184,6 +221,9 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 - `/ant`: 개미굴 창 열기
 - `/ant stats`: 지금까지의 활용, 군락 유형, 배운 도구
+- `/ant dex`: 손님 도감
+- `/ant gift` · `/ant adopt <코드>`: 여왕 선물하기, 입양하기
+- `/ant card`: 프로필 카드 만들기
 - `/ant species`: 개미종 목록
 - `/ant new <종>`: 그 종으로 새 군락 시작
 - `/ant reset`: 처음부터 다시
