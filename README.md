@@ -135,6 +135,8 @@ claude plugin install ant-nest --marketplace findot-ai/ant-nest
 
 In the desktop app: click + next to the prompt box, then Plugins, Add marketplace with `findot-ai/ant-nest`, then Add plugin.
 
+**Get updates automatically.** Third-party marketplaces don't auto-update by default. Run `/plugin`, open **Marketplaces**, select `ant-nest`, and choose **Enable auto-update**. Without it, update by hand with `/plugin marketplace update ant-nest`. After an update, the nest tells you once what's new.
+
 The desktop app draws the nest as pixel art in a side pane. A terminal draws it with half-block characters. On a narrow terminal the pane does not open by itself; use `/ant`.
 
 ---
@@ -271,6 +273,8 @@ claude plugin install ant-nest --marketplace findot-ai/ant-nest
 ```
 
 데스크톱 앱에서는 입력창 옆 + → Plugins → Add marketplace에 `findot-ai/ant-nest`를 넣고 Add plugin을 누릅니다.
+
+**업데이트 자동으로 받기.** 개인 마켓플레이스는 자동 업데이트가 기본으로 꺼져 있습니다. `/plugin` → **Marketplaces** → `ant-nest` → **Enable auto-update**를 켜 두세요. 켜지 않으면 `/plugin marketplace update ant-nest`로 직접 업데이트합니다. 업데이트된 뒤 처음 켜질 때 개미굴이 새 기능을 한 번 알려 줍니다.
 
 데스크톱 앱에서는 옆 창에 도트 그림으로, 터미널에서는 반 블록 문자로 그립니다. 터미널 폭이 좁으면 창이 자동으로 뜨지 않으니 `/ant`로 여세요.
 

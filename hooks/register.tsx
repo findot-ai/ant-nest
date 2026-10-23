@@ -24,7 +24,11 @@ import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
-const VERSION = '0.14.5'
+const VERSION = '0.15.0'
+// 업데이트 직후 처음 켜질 때 한 번 알려 줄 새 기능 (최근 것만, 전체는 CHANGELOG.md)
+const WHATS_NEW: Record<string, [string, string]> = {
+  '0.15.0': ['업데이트 알림 · 방끼리 이어지는 굴과 샛길 · 기록 5개씩 넘겨 보기 · 눈에 띄는 병정개미와 생물', 'Update notes · chambers that branch and link up · paged history · easy-to-spot majors and creatures'],
+}
 const PANE = 'ant-nest'
 // 접속 75초 = 게임 1시간, 접속 30분 = 게임 하루, 약 35시간 = 게임 1년. 한 세대(여왕 수명 5~10년)는 매일 쓰면 현실 약 3개월
 const FRAME_MS = 500, FRAMES_PER_HOUR = 150
@@ -210,6 +214,16 @@ export const register: Register = (on, options) => {
     // 사람 없이 돌아가는 세션(-p, SDK, 예약 실행)은 자동화다
     if (!e.isInteractive) { w.instinct = Math.min(10, w.instinct + 0.5); bump('auto') }
     await $.command.register({ name: 'ant', description: '개미굴 / Ant nest — hide·show(이 프로젝트 화면만 숨기기) · off·on(이 프로젝트 끄기) · report · stats · dex · species · new <종> · gift · adopt · card · version · reset' })
+    // 버전이 바뀐 뒤 첫 실행이면 새 기능을 한 번 알린다 (처음 설치할 때는 조용히 기록만)
+    { const seen = (await $.store.get('seenVersion')) as string | undefined
+      if (seen !== VERSION) {
+        await $.store.set('seenVersion', VERSION)
+        if (seen && e.isInteractive && !muted) {
+          const [ko, en2] = WHATS_NEW[VERSION] ?? ['자세한 변경은 GitHub의 CHANGELOG.md', 'See CHANGELOG.md on GitHub for details']
+          say(w, `개미굴이 v${VERSION}로 업데이트됐다: ${ko}`, `Ant Nest updated to v${VERSION}: ${en2}`)
+          void $.ui.toast(lang === 'en' ? `🐜 Ant Nest v${VERSION}: ${en2}` : `🐜 개미굴 v${VERSION} 업데이트: ${ko}`)
+        }
+      } }
     if (!quiet()) { const opened = await $.ui.open({ id: PANE, title: T.title }); paneNote = opened.isPlaced ? 'placed' : opened.reason }
     $.clock.every(FRAME_MS, () => {
       frame++

@@ -79,3 +79,23 @@ test('the band above the prompt and every command answer', async ($, on) => {
   const adopted = await $.command.run({ command: 'ant', args: `adopt ${code}` } as never)
   expect(JSON.stringify(adopted)).not.toContain('올바른 선물 코드가 아닙')
 })
+
+test('after an update the nest says once what is new', async ($, on) => {
+  const store: Record<string, unknown> = { seenVersion: '0.14.0' }, toasts: string[] = []
+  on('command.register', () => ({ value: { command: 'ant' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('clock.every', () => ({ value: undefined }))
+  on('store.get', (_, e) => ({ value: store[(e as { key: string }).key] }))
+  on('store.set', (_, e) => { const x = e as { key: string; value: unknown }; store[x.key] = x.value; return { value: undefined } })
+  on('store.delete', () => ({ value: undefined }))
+  on('store.keys', () => ({ value: Object.keys(store) }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', (_, e) => { toasts.push(JSON.stringify(e)); return { value: undefined } })
+  on('env.get', () => ({ value: undefined }))
+  on('fs.list', () => { throw new Error('none') })
+  on('fs.read', () => { throw new Error('none') })
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  expect(toasts.some(t => t.includes('v0.15.0'))).toBe(true)
+  expect(store.seenVersion).toBe('0.15.0')
+})

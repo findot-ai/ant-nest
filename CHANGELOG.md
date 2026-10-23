@@ -3,6 +3,11 @@
 Every version of Ant Nest, newest first. Each entry is written in English, then Korean.
 개미굴의 모든 버전 기록입니다. 최신순이고, 각 항목은 영문 다음 국문입니다.
 
+## 0.15.0
+
+- After an update, the nest tells you once what's new (a toast and a History entry). The README explains how to turn on auto-update.
+- 업데이트된 뒤 처음 켜질 때 새 기능을 한 번 알려 줍니다(알림과 기록). README에 자동 업데이트 켜는 법을 넣었습니다.
+
 ## 0.14.5
 
 - Chambers also branch off other chambers, sometimes sloping down, and nearby chambers get linked by short connecting tunnels, as in real nests. Chambers are never dug into rock.
