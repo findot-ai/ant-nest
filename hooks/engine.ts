@@ -568,10 +568,23 @@ function tournament(w: World, pop: number) {
 }
 
 // ---------- 개미집 생물: 종마다 함께 사는 생물이 희귀도에 따라 찾아온다. 도감은 세대를 넘어 이어진다 ----------
-const GUEST_P = [0, 0.07, 0.025, 0.01, 0.003]
-function guestDay(w: World) {
-  const pop = workers(w) + majors(w), calls = Object.values(w.today).reduce((a, b) => a + b, 0)
+const GUEST_P = [0, 0.14, 0.05, 0.02, 0.006]
+// 생물마다 다음 확인 때 찾아올 확률. 첫 생물은 접속 1~2시간 안에 오도록 크게 올린다
+export function guestOdds(w: World) {
+  if (isWinter(w) || w.guests.length >= 3) return [] as { id: GuestId; p: number }[]
+  const pop = workers(w) + majors(w), calls = Object.values(w.today).reduce((a, b) => a + (b ?? 0), 0)
   const boost = (pop > 80 ? 1 : pop > 25 ? 0.6 : 0.25) * (calls > 30 ? 1.6 : calls > 5 ? 1.2 : 1)
+  const first = Object.keys(w.dex ?? {}).length === 0
+  const list = guestsFor(w.species).filter(d => !w.guests.some(g => g.id === d.id))
+  const easiest = Math.min(...list.map(d => d.rarity))
+  return list.map(d => ({ id: d.id, p: first && d.rarity === easiest ? (Math.floor(w.tick / 24) >= 3 ? 1 : 0.45) : Math.min(0.9, GUEST_P[d.rarity]! * boost) }))
+}
+// 다음 확인까지 남은 실제 시간(분)과, 그때 생물이 하나라도 올 확률
+export function nextGuestRoll(w: World) {
+  const odds = guestOdds(w), none = odds.reduce((a, o) => a * (1 - o.p), 1)
+  return { minutes: (24 - (w.tick % 24)) * 1.25, chance: 1 - none, blocked: isWinter(w) ? 'winter' : w.guests.length >= 3 ? 'full' : '' }
+}
+function guestDay(w: World) {
   for (const g of w.guests) {
     g.days--
     const def = guestById(g.id)
@@ -580,9 +593,9 @@ function guestDay(w: World) {
     else if (def.effect === 'honeydew') w.carb += 1.2
   }
   w.guests = w.guests.filter(g => g.days > 0)
-  if (isWinter(w) || w.guests.length >= 3) return
-  for (const def of guestsFor(w.species)) {
-    if (w.guests.some(g => g.id === def.id) || rnd() > GUEST_P[def.rarity]! * boost) continue
+  for (const o of guestOdds(w)) {
+    if (rnd() > o.p) continue
+    const def = guestById(o.id)
     let x = 0, y = 0
     if (def.surface) { const t = w.trees[Math.floor(rnd() * w.trees.length)]!; x = t.x; y = SURF - t.h + 2 }
     else { const c = w.chambers[Math.floor(rnd() * w.chambers.length)]!; x = c.cx + Math.floor((rnd() - 0.5) * c.rx); y = c.cy + c.ry }

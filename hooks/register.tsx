@@ -3,7 +3,7 @@ import type { Register, RenderChildren } from 'claude-code'
 
 import {
   newWorld, hourTick, moveAnts, syncAnts, sendForager, sendDigger, spawnSpider, spawnCentipede, defeatCentipede, farmFor, sendTo,
-  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid, capacity, isWinter, prettyServer, feedBrood, nextHatchMinutes, rollDay, snapshot, emptyTally,
+  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid, capacity, isWinter, prettyServer, feedBrood, nextHatchMinutes, rollDay, snapshot, emptyTally, nextGuestRoll,
 } from './engine'
 import { emptyProfile, scanTranscript, scanHistory, scanSettings, pickSetup } from './profile'
 import { SPECIES, SPECIES_IDS } from './species'
@@ -17,7 +17,7 @@ import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
-const VERSION = '0.13.0'
+const VERSION = '0.14.0'
 const PANE = 'ant-nest'
 // 접속 75초 = 게임 1시간, 접속 30분 = 게임 하루, 약 35시간 = 게임 1년. 한 세대(여왕 수명 5~10년)는 매일 쓰면 현실 약 3개월
 const FRAME_MS = 500, FRAMES_PER_HOUR = 150
@@ -453,6 +453,9 @@ export const register: Register = (on, options) => {
     const { Svg: DexSvg } = e.surface === 'terminal' ? { Svg: null } : $.ui.resolve(e as typeof e & { surface: 'desktop' })
     const dex = (
       <Box flexDirection="column" gap={1}>
+        {(() => { const r = nextGuestRoll(w), m = Math.max(1, Math.round(r.minutes)), pct = Math.round(r.chance * 100)
+          const msg = r.blocked === 'winter' ? (en ? 'No creatures come in winter.' : '겨울에는 생물이 찾아오지 않습니다.') : r.blocked === 'full' ? (en ? 'The nest is full of visitors (3). New ones come after some leave.' : '이미 생물 3마리가 와 있습니다. 떠나면 새 생물이 옵니다.') : (en ? `Next check in ~${m} min · chance a creature comes: ${pct}%` : `다음 확인까지 약 ${m}분 · 생물이 찾아올 확률 ${pct}%`)
+          return <Box borderStyle="round" borderColor="suggestion" paddingX={1} flexDirection="column"><Text size="footnote" weight="semibold">🔎 {msg}</Text><Text size="caption" dimColor>{en ? 'A bigger colony and more AI use today raise the odds. Some creatures live only with certain species.' : '군락이 클수록, 오늘 AI를 많이 쓸수록 확률이 오릅니다. 어떤 생물은 특정 개미종하고만 삽니다.'}</Text></Box> })()}
         <Text size="footnote" dimColor>{en ? `Found ${Object.keys(w.dex).length} of ${GUESTS.length}. Visiting now: ` : `${GUESTS.length}종 중 ${Object.keys(w.dex).length}종 발견 · 지금 방문 중: `}{w.guests.length ? w.guests.map(g => (en ? guestById(g.id).en : guestById(g.id).ko)).join(', ') : (en ? 'none' : '없음')}</Text>
         <Box flexDirection="row" flexWrap="wrap" gap={1}>
           {GUESTS.map(g => {

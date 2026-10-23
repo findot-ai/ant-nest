@@ -75,7 +75,7 @@ The 30 most recent conversations are read, large ones streamed line by line.
 
 ## Creature dex
 
-Real ant nests host lodgers. Depending on your species, guests drop in: ant crickets that beg food, rove beetles that steal brood, blue butterfly caterpillars that pay in honeydew, the legendary *Niphanda fusca* caterpillar that grows only in Japanese carpenter ant nests, the tiny roach of leafcutter gardens, antbirds that follow army ant raids, and the extremely rare gynandromorph ant, born half female and half male. They come in four rarities, and your creature dex carries over across generations and species. `/ant dex` shows what you have found.
+Real ant nests host lodgers. Depending on your species, guests drop in: ant crickets that beg food, rove beetles that steal brood, blue butterfly caterpillars that pay in honeydew, the legendary *Niphanda fusca* caterpillar that grows only in Japanese carpenter ant nests, the tiny roach of leafcutter gardens, antbirds that follow army ant raids, and the extremely rare gynandromorph ant, born half female and half male. They come in four rarities; the first one shows up within an hour or two, and the Creatures tab shows the odds for the next check. Your creature dex carries over across generations and species. `/ant dex` shows what you have found.
 
 ## Gift a queen, show your card
 
@@ -214,7 +214,7 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 - 군대개미 행렬을 따라다니는 개미새
 - 몸 절반은 암컷, 절반은 수컷인 아주 드문 암수한몸 개미
 
-희귀도는 네 단계이고, 생물 도감은 세대와 종을 바꿔도 이어집니다. `/ant dex`로 봅니다.
+희귀도는 네 단계이고, 첫 생물은 접속 1~2시간 안에 찾아옵니다. 생물 도감 탭에서 다음 확인까지 남은 시간과 확률을 볼 수 있고, 도감은 세대와 종을 바꿔도 이어집니다. `/ant dex`로 봅니다.
 
 ## 여왕 선물하기, 군락 카드
 
