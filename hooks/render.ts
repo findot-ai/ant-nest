@@ -1,4 +1,4 @@
-import { W, H, SURF, CM, SKY, SOIL, TUN, ROCK, ROOMNAME, ROOMNAME_EN, idx, layerOf, season, hour, chamberAt, frostDepth } from './engine'
+import { W, H, SURF, CM, SKY, SOIL, TUN, ROCK, ROOMNAME, ROOMNAME_EN, SP, idx, layerOf, season, hour, chamberAt, frostDepth } from './engine'
 import type { World, Ant, Lang } from './engine'
 
 const SOILC = ['#563a26', '#a47646', '#805e44', '#625852']
@@ -69,7 +69,8 @@ const SOILD = ['#4a3020', '#8e6339', '#6e5038', '#544b46'], SOILL = ['#644230', 
 const L_BG = 0, L_TERR = 1, L_EDGE = 2, L_ITEM = 3, L_ANT = 4, L_FX = 5, L_TXT = 6
 
 export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
-  const RN = lang === 'en' ? ROOMNAME_EN : ROOMNAME
+  const sp = SP(w)
+  const RN = { ...(lang === 'en' ? ROOMNAME_EN : ROOMNAME), ...(sp.storeKo ? { store: lang === 'en' ? sp.storeEn! : sp.storeKo } : {}) }
   const s = season(w), nt = night(w), h = hour(w), P = new Painter(7), WW = W * S, HH = H * S, GY = SURF * S
   const defs: string[] = []
   // 하늘
@@ -168,7 +169,13 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
   // 창고와 쓰레기 방
   for (const c of w.chambers) {
     const floor = (c.cy + c.ry) * S + S - 2, x0 = (c.cx - c.rx) * S + 2, span = (c.rx * 2 + 1) * S - 4
-    if (c.type === 'store') {
+    if (c.type === 'store' && sp.id === 'atta') {
+      const n = Math.min(10, 2 + Math.round(w.carb / 30))
+      for (let k = 0; k < n; k++) { const x = x0 + ((k * 7) % span), hh = 4 + (k % 3) * 2; P.rect(L_ITEM, x, floor - hh, 5, hh, '#e9e2c8'); P.rect(L_ITEM, x + 1, floor - hh, 3, 1, '#ffffff'); P.rect(L_ITEM, x, floor - 1, 5, 1, '#5d7a3a') }
+    } else if (c.type === 'store' && sp.id === 'honeypot') {
+      const n = Math.min(c.rx * 2, 1 + Math.round(w.carb / 40)), ceil = (c.cy - c.ry) * S + 1
+      for (let k = 0; k < n; k++) { const x = x0 + 2 + ((k * 6) % (span - 4)); P.rect(L_ITEM, x + 1, ceil, 2, 2, sp.body); P.rect(L_ITEM, x, ceil + 2, 5, 5, '#e8a838'); P.rect(L_ITEM, x + 1, ceil + 3, 1, 1, '#fff0b8') }
+    } else if (c.type === 'store') {
       const nC = Math.min(14, Math.round(w.carb / 20)), nP = Math.min(8, Math.round(w.prot / 15))
       for (let k = 0; k < nC; k++) { const x = x0 + ((k * 7) % span), y = floor - 3 - Math.floor((k * 7) / span) * 3; P.rect(L_ITEM, x, y, 3, 3, '#e8a838'); P.rect(L_ITEM, x, y, 1, 1, '#fff0b8') }
       for (let k = 0; k < nP; k++) P.rect(L_ITEM, x0 + span - 4 - ((k * 9) % span), floor - 3 - (k % 2) * 2, 4, 2, '#b2442c')
@@ -178,7 +185,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
   const flip = w.tick % 2
   for (const [i, a] of ants.entries()) {
     const f = a.f ?? 1, out = a.st === 'out', climbing = out && a.up > 0
-    const body = a.job === 'swarm' ? '#2b0e07' : a.kind === 'm' ? '#3a2214' : '#140c08'
+    const body = a.job === 'swarm' ? '#2b0e07' : a.kind === 'm' ? sp.major : sp.body
     if (climbing) {
       const x = a.x * S + (i % 2 ? 4 : -2), y = GY - 6 - a.up * S
       P.rect(L_ANT, x + 1, y, 2, 2, body); P.rect(L_ANT, x + 1, y + 2, 2, 1, body); P.rect(L_ANT, x, y + 3, 4, 3, body)
@@ -222,9 +229,14 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
       P.rect(L_TXT, t.x * S - 4, t.y * S - 7, 14, 3, '#2a1a12'); P.rect(L_TXT, t.x * S - 4, t.y * S - 7, Math.max(1, Math.round((14 * t.hp) / t.hp0)), 3, '#de6a4c')
     }
   }
+  // 결혼비행: 날개 달린 신여왕과 수개미가 하늘을 난다
+  if (w.flight > 0) for (let k = 0; k < 14; k++) {
+    const x = (hash(k, 21) * WW + w.tick * (2 + k % 3) + k * 13) % WW, y = 8 + ((hash(k, 22) * (GY - 30) + w.tick * 3 * (k % 2 ? 1 : -1)) % (GY - 30) + GY) % (GY - 30)
+    P.rect(L_FX, x, y + 1, 4, 2, sp.body); P.rect(L_FX, x + 1, y - 2 + flip, 3, 2, 'rgba(235,240,255,.75)'); P.rect(L_FX, x + 4, y + 1, 1, 1, sp.body)
+  }
   // 비와 눈
   if (w.rain > 0 && s !== 3) for (let k = 0; k < 50; k++) P.rect(L_FX, (k * 37 + w.tick * 13) % WW, (k * 23 + w.tick * 29) % (GY - 4), 1, 5, 'rgba(215,232,245,.75)')
-  if (s === 3) for (let k = 0; k < 40; k++) P.rect(L_FX, (k * 41 + w.tick * 3) % WW, (k * 19 + w.tick * 5) % (GY - 4), 2, 2, 'rgba(255,255,255,.85)')
+  if (s === 3 && sp.climate === 'temperate') for (let k = 0; k < 40; k++) P.rect(L_FX, (k * 41 + w.tick * 3) % WW, (k * 19 + w.tick * 5) % (GY - 4), 2, 2, 'rgba(255,255,255,.85)')
   if (nt > 0) P.rect(L_FX, 0, 0, WW, GY, `rgba(8,10,28,${(nt * 0.22).toFixed(2)})`)
   // 글자: 배경 상자를 깔고, 겹치면 생략
   const boxes: [number, number, number, number][] = []

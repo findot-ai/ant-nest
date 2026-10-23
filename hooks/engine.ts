@@ -1,11 +1,15 @@
 // 개미굴 시뮬레이션: 브라우저 실험실(v0.4)의 모델을 줄여 옮긴 것.
-// 1 tick = 게임 1시간. 계절 21일(겨울 7일). 군락은 3년차에서 시작한다.
+// 1 tick = 게임 1시간. 계절 21일(겨울 7일). 시작 규모와 종은 설치 시점의 사용 패턴으로 정한다.
+import { SPECIES } from './species'
+import type { SpeciesId, Species } from './species'
 export const W = 48, H = 64, SURF = 12, CM = 3
 export const SKY = 0, SOIL = 1, TUN = 2, ROCK = 3
 export const SEASONS = ['봄', '여름', '가을', '겨울']
 export const SEASONS_EN = ['Spring', 'Summer', 'Autumn', 'Winter']
 export type Lang = 'ko' | 'en'
-const SEASON_T = [15, 25, 15, -3], SEASON_RAMP = [7, 1, -8, 0], T0 = 15
+const CLIMATE = { temperate: { t: [15, 25, 15, -3], ramp: [7, 1, -8, 0] }, tropical: { t: [26, 27, 26, 24], ramp: [0, 0, 0, 0] }, desert: { t: [20, 31, 21, 6], ramp: [6, 1, -7, 0] } }
+const T0 = 15
+export const YEAR_DAYS = 70
 const DD: Record<Stage, number> = { egg: 18, larva: 30, pupa: 26 }
 export const ROOMNAME: Record<RoomType, string> = { queen: '여왕방', brood: '육아방', store: '식량 창고', waste: '쓰레기 방' }
 export const ROOMNAME_EN: Record<RoomType, string> = { queen: 'Queen', brood: 'Nursery', store: 'Storage', waste: 'Midden' }
@@ -17,13 +21,17 @@ export type Brood = { st: Stage; n: number; dev: number; prot: number; room: num
 export type Cohort = { age: number; n: number; kind: 'w' | 'm' }
 export type Ant = { x: number; y: number; kind: 'w' | 'm'; job: 'idle' | 'forage' | 'dig' | 'guard' | 'swarm'; st: 'in' | 'out'; tx: number; carry: 0 | 1 | 2; t: number; climb: number; up: number; f?: number }
 export type Threat = { k: 'spider' | 'centipede'; x: number; y: number; hp: number; hp0: number; life: number; tool?: string; trail: [number, number][]; alarmR: number; ate: number }
+export type Lineage = { gen: number; species: SpeciesId; years: number; peak: number; fixed: number; ended: 'succession' | 'collapse' }
+export type Origin = { stage: Stage0; ko: string; en: string }
+export type Stage0 = 'found' | 'young' | 'mature'
+export type Setup = { species: SpeciesId; stage: Stage0; farms: string[]; trail: number; instinct: number; majorBias: number; storeBias: number; ko: string; en: string }
 export type LogLine = { s: number; d: number; ko: string; en: string }
 export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number }
 
 export type World = {
-  v: 3; seed: number; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
+  v: 4; over?: boolean; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
-  queen: { room: number; home: number; health: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
+  queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
   today: Tally; total: Tally; dayKey: string
   instinct: number; trail: number; learned: Record<string, string>
@@ -31,12 +39,18 @@ export type World = {
 
 export const epDays = (w: World) => ((w.ep - 1) % 4 === 3 ? 7 : 21)
 export const season = (w: World) => (w.ep - 1) % 4
+export const SP = (w: World): Species => SPECIES[w.species] ?? SPECIES.japonicus
+// 겨울잠: 온대·사막 종만 겨울에 멈춘다 (열대는 건기일 뿐)
+export const isWinter = (w: World) => season(w) === 3 && SP(w).climate !== 'tropical'
+export const SEASONS_TROP = ['우기 초', '우기', '건기 초', '건기'], SEASONS_TROP_EN = ['Early wet', 'Wet season', 'Early dry', 'Dry season']
+export const seasonName = (w: World, s: number, lang: Lang) => (SP(w).climate === 'tropical' ? (lang === 'en' ? SEASONS_TROP_EN : SEASONS_TROP) : lang === 'en' ? SEASONS_EN : SEASONS)[s]!
+export const queenYears = (w: World) => w.queen.age / YEAR_DAYS
 export const hour = (w: World) => w.tick % 24
 export const isDay = (w: World) => { const h = hour(w); return h >= 6 && h < 19 }
 export const workers = (w: World) => w.cohorts.filter(c => c.kind === 'w').reduce((a, c) => a + c.n, 0)
 export const majors = (w: World) => w.cohorts.filter(c => c.kind === 'm').reduce((a, c) => a + c.n, 0)
 export const bcount = (w: World, st: Stage) => w.brood.filter(b => b.st === st).reduce((a, b) => a + b.n, 0)
-export const epName = (ep: number, lang: Lang = 'ko') => (lang === 'en' ? `Year ${Math.floor((ep - 1) / 4) + 1} ${SEASONS_EN[(ep - 1) % 4]}` : `${Math.floor((ep - 1) / 4) + 1}년차 ${SEASONS[(ep - 1) % 4]}`)
+export const epName = (ep: number, lang: Lang = 'ko', w?: World) => { const sn = w ? seasonName(w, (ep - 1) % 4, lang) : (lang === 'en' ? SEASONS_EN : SEASONS)[(ep - 1) % 4]; return lang === 'en' ? `Year ${Math.floor((ep - 1) / 4) + 1} ${sn}` : `${Math.floor((ep - 1) / 4) + 1}년차 ${sn}` }
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v)
 export const idx = (x: number, y: number) => y * W + x
 export const inb = (x: number, y: number) => x >= 0 && x < W && y >= 0 && y < H
@@ -47,7 +61,8 @@ export const emptyTally = (): Tally => ({ explore: 0, build: 0, hunt: 0, raise: 
 // ---------- 온도: T(z,t) = 12 + (계절평균−12)e^(−z/80) + 일교차·e^(−z/12)·sin(ωt − z/12) ----------
 export function airMean(w: World) {
   const s = season(w)
-  return SEASON_T[s]! + SEASON_RAMP[s]! * ((w.day - 1) / (epDays(w) - 1) - 0.5) + (w.rain > 0 ? -2 : 0)
+  const C = CLIMATE[SP(w).climate]
+  return C.t[s]! + C.ramp[s]! * ((w.day - 1) / (epDays(w) - 1) - 0.5) + (w.rain > 0 ? -2 : 0)
 }
 export function tempAt(w: World, y: number) {
   const s = season(w), z = Math.max(0, (y - SURF) * CM), amp = s === 1 ? 6 : s === 3 ? 4 : 5.5
@@ -79,12 +94,22 @@ function makeChamber(w: World, cx: number, cy: number, rx: number, ry: number, t
   w.chambers.push({ id, cx, cy, rx, ry, type }); return id
 }
 
-export function newWorld(seed = Math.floor(rnd() * 90000) + 10000): World {
+export const DEFAULT_SETUP: Setup = { species: 'japonicus', stage: 'mature', farms: [], trail: 0, instinct: 0, majorBias: 0, storeBias: 0, ko: '', en: '' }
+
+export function newWorld(setup: Setup = DEFAULT_SETUP, gen = 1, lineage: Lineage[] = []): World {
+  const seed = Math.floor(rnd() * 90000) + 10000, st = setup.stage
+  const cohorts: Cohort[] = st === 'found' ? [{ age: 5, n: 6, kind: 'w' }]
+    : st === 'young' ? [{ age: 30, n: 22, kind: 'w' }, { age: 10, n: 16, kind: 'w' }]
+      : [{ age: 60, n: 46, kind: 'w' }, { age: 25, n: 52, kind: 'w' }, { age: 8, n: 14, kind: 'w' }, { age: 40, n: 9, kind: 'm' }]
   const w: World = {
-    v: 3, seed, grid: new Array(W * H).fill(SOIL), chambers: [], trees: [], ep: 1, day: 1, tick: 6,
-    cohorts: [{ age: 60, n: 46, kind: 'w' }, { age: 25, n: 52, kind: 'w' }, { age: 8, n: 14, kind: 'w' }, { age: 40, n: 9, kind: 'm' }],
-    brood: [], carb: 45, prot: 16, queen: { room: 0, home: 0, health: 100 }, deepest: SURF, tips: [], digQueue: 0, rain: 0,
-    threats: [], streak: {}, log: [], today: emptyTally(), total: emptyTally(), dayKey: '', instinct: 0, trail: 0, learned: {},
+    v: 4, seed, species: setup.species, gen, lineage, peak: 0, flownYear: -1, alates: 0, flight: 0,
+    origin: { stage: st, ko: setup.ko, en: setup.en },
+    grid: new Array(W * H).fill(SOIL), chambers: [], trees: [], ep: 1, day: 1, tick: 6,
+    cohorts, brood: [], carb: st === 'found' ? 20 : st === 'young' ? 30 : 45, prot: st === 'found' ? 8 : 16,
+    queen: { room: 0, home: 0, health: 100, age: st === 'found' ? 0 : st === 'young' ? YEAR_DAYS : YEAR_DAYS * 2 },
+    deepest: SURF, tips: [], digQueue: 0, rain: 0,
+    threats: [], streak: {}, log: [], today: emptyTally(), total: emptyTally(), dayKey: '',
+    instinct: setup.instinct, trail: setup.trail, learned: {},
   }
   for (let y = 0; y < SURF; y++) for (let x = 0; x < W; x++) w.grid[idx(x, y)] = SKY
   const nx = 16 + Math.floor(rnd() * 16)
@@ -97,21 +122,51 @@ export function newWorld(seed = Math.floor(rnd() * 90000) + 10000): World {
   }
   for (let y = H - 2; y < H; y++) for (let x = 0; x < W; x++) w.grid[idx(x, y)] = ROCK
   for (const x of [5 + Math.floor(rnd() * 6), W - 6 - Math.floor(rnd() * 6)]) w.trees.push({ x, h: 7 + Math.floor(rnd() * 3) })
-  // 3년차 둥지: 세로 갱도 하나에 방이 층층이 (얕은 방은 길쭉, 깊은 방은 둥글게)
-  for (let y = SURF; y <= SURF + 24; y++) { carve(w, nx, y); if (y < SURF + 3) carve(w, nx + 1, y) }
-  const L: [number, number, RoomType, number, number][] = [[3, -1, 'store', 4, 1], [6, 1, 'waste', 2, 1], [10, -1, 'brood', 3, 1], [14, 1, 'brood', 3, 2], [18, -1, 'queen', 3, 2], [23, 1, 'brood', 3, 2]]
+  // 둥지: 세로 갱도 하나에 방이 층층이 (얕은 방은 길쭉, 깊은 방은 둥글게). 창업 군락은 얕은 첫 방 하나.
+  const L: [number, number, RoomType, number, number][] = st === 'found' ? [[7, 1, 'queen', 2, 1]]
+    : st === 'young' ? [[3, -1, 'store', 3, 1], [8, 1, 'brood', 3, 1], [12, -1, 'queen', 3, 2]]
+      : [[3, -1, 'store', 4, 1], [6, 1, 'waste', 2, 1], [10, -1, 'brood', 3, 1], [14, 1, 'brood', 3, 2], [18, -1, 'queen', 3, 2], [23, 1, 'brood', 3, 2]]
+  const depth = L[L.length - 1]![0] + 1
+  for (let y = SURF; y <= SURF + depth; y++) { carve(w, nx, y); if (y < SURF + 3) carve(w, nx + 1, y) }
   for (const [d, dir, type, rx, ry] of L) {
     const y = SURF + d; let ex = nx
     for (let k = 0; k < 3; k++) { ex += dir; carve(w, ex, y) }
     const id = makeChamber(w, ex + dir * (rx + 1), y, rx, ry, type)
-    if (type === 'queen') w.queen = { room: id, home: id, health: 100 }
+    if (type === 'queen') { w.queen.room = id; w.queen.home = id }
   }
-  w.tips.push({ x: nx, y: SURF + 24, dx: 0, dy: 1 }, { x: nx - 6, y: SURF + 10, dx: -1, dy: 0 })
-  w.brood.push({ st: 'larva', n: 24, dev: 0.35, prot: 24 * 0.12, room: w.queen.room })
-  say(w, '3년차 군락. 일개미 112, 병정 9, 애벌레 24마리가 함께 겨울을 났다.', 'A third-year colony: 112 workers, 9 majors and 24 larvae made it through winter.')
+  w.tips.push({ x: nx, y: SURF + depth, dx: 0, dy: 1 }, { x: nx - 4, y: SURF + 3, dx: -1, dy: 0 })
+  const sp = SPECIES[setup.species]
+  if (st === 'found') {
+    w.brood.push({ st: 'egg', n: 8, dev: 0.2, prot: 0, room: w.queen.room })
+    say(w, `${gen > 1 ? `${gen}대째. ` : ''}결혼비행을 마친 ${sp.ko} 여왕이 첫 방을 팠다. 첫 일개미 6마리와 알 8개.`, `${gen > 1 ? `Generation ${gen}. ` : ''}A ${sp.en.toLowerCase()} queen, back from her mating flight, dug her first chamber. Six first workers and eight eggs.`)
+  } else if (st === 'young') {
+    w.brood.push({ st: 'larva', n: 12, dev: 0.3, prot: 12 * (0.1 + setup.majorBias), room: w.queen.room })
+    say(w, `2년차 ${sp.ko} 군락. 일개미 38마리와 애벌레 12마리가 겨울을 났다.`, `A second-year ${sp.en.toLowerCase()} colony: 38 workers and 12 larvae made it through winter.`)
+  } else {
+    w.brood.push({ st: 'larva', n: 24, dev: 0.35, prot: 24 * (0.12 + setup.majorBias), room: w.queen.room })
+    say(w, `3년차 ${sp.ko} 군락. 일개미 112, 병정 9, 애벌레 24마리가 함께 겨울을 났다.`, `A third-year ${sp.en.toLowerCase()} colony: 112 workers, 9 majors and 24 larvae made it through winter.`)
+  }
+  w.carb *= 1 + setup.storeBias
+  for (const f of setup.farms.slice(0, 4)) farmFor(w, f)
   say(w, '이제부터 당신의 AI 활용이 이 군락의 먹이이자 날씨다.', 'From now on, the way you use AI is this colony\'s food and weather.')
   return w
 }
+
+// 여왕이 죽으면: 결혼비행을 보낸 적이 있으면 신여왕이 다음 세대를 잇고, 없으면 빈 땅에 새 군락이 선다
+export function nextGeneration(w: World): World {
+  const succ = w.alates > 0
+  const lineage = [...w.lineage, { gen: w.gen, species: w.species, years: Math.round(queenYears(w) * 10) / 10, peak: Math.round(w.peak), fixed: w.total.fixed, ended: succ ? 'succession' : 'collapse' } as Lineage]
+  const nw = newWorld({ ...DEFAULT_SETUP, species: w.species, stage: 'found', farms: w.trees.filter(t => t.farm).map(t => t.farm!), instinct: w.instinct * 0.5 }, succ ? w.gen + 1 : 1, lineage)
+  nw.total = { ...w.total }; nw.learned = w.learned
+  return nw
+}
+
+export function colonyLevel(w: World) {
+  let score = (w.gen - 1) * 10 + w.peak / 20 + queenYears(w) * 3 + w.total.fixed
+  for (const l of w.lineage) score += l.peak / 20 + l.years * 3 + (l.ended === 'succession' ? 10 : 0)
+  return Math.floor(Math.sqrt(Math.max(0, score) * 2)) + 1
+}
+
 
 export function say(w: World, ko: string, en: string) {
   w.log.push({ s: season(w), d: w.day, ko, en })
@@ -142,11 +197,12 @@ function digStep(w: World) {
 }
 
 // ---------- 시간 ----------
+
 function broodHour(w: World) {
-  const winter = season(w) === 3
+  const winter = isWinter(w)
   for (const b of w.brood) {
     const c = w.chambers[b.room] ?? w.chambers[w.queen.room]!
-    const add = winter && b.st !== 'pupa' ? 0 : Math.max(0, tempAt(w, c.cy) - T0) / DD[b.st] / 24
+    const add = winter && b.st !== 'pupa' ? 0 : Math.max(0, tempAt(w, c.cy) - T0) / (DD[b.st] * SP(w).devK) / 24
     b.dev += add
     if (b.dev >= 1) {
       b.dev = 0
@@ -159,14 +215,14 @@ function broodHour(w: World) {
 }
 function emerge(w: World, b: Brood) {
   const sat = b.prot / Math.max(0.1, b.n) / 0.2
-  const mf = workers(w) > 30 && sat > 0.5 ? clamp(0.03 + (sat - 0.6) * 0.12, 0, 0.25) : 0
+  const mf = workers(w) > 30 && sat > 0.5 ? clamp((0.03 + (sat - 0.6) * 0.12) * SP(w).majorK, 0, 0.3) : 0
   w.cohorts.push({ age: 0, n: b.n * (1 - mf), kind: 'w' })
   if (mf > 0) w.cohorts.push({ age: 0, n: b.n * mf, kind: 'm' })
   if (b.n > 1) say(w, `고치에서 새 일개미 ${Math.round(b.n * (1 - mf))}마리${mf > 0.02 ? `, 병정 ${Math.round(b.n * mf)}마리` : ''}가 깨어났다.`, `${Math.round(b.n * (1 - mf))} new workers${mf > 0.02 ? ` and ${Math.round(b.n * mf)} majors` : ''} hatched from their cocoons.`)
 }
 function relocateBrood(w: World) {
   const cands = w.chambers.filter(c => c.type === 'brood' || c.type === 'queen')
-  if (!cands.length || season(w) === 3) return
+  if (!cands.length || isWinter(w)) return
   const score = (c: Chamber) => -Math.abs(tempAt(w, c.cy) - 26) - (c.type === 'brood' ? 0 : 1.5)
   let best = cands[0]!; for (const c of cands) if (score(c) > score(best)) best = c
   for (const b of w.brood) { const cur = w.chambers[b.room]; if (!cur || score(best) - score(cur) > 2) b.room = best.id }
@@ -177,14 +233,14 @@ function dayTick(w: World) {
   // 본능 채집(기본 수입). AI 활용 이벤트는 따로 들어온다.
   // 자동화는 본능이 된다: 내가 없어도 개미들이 스스로 하는 일
   const inst = 1 + w.instinct * 0.1
-  if (s !== 3 && w.rain <= 0) { w.carb += Wn * 0.028 * inst; w.prot += Wn * 0.004 * inst }
+  if (!isWinter(w) && w.rain <= 0) { w.carb += Wn * 0.028 * inst; w.prot += Wn * 0.004 * inst }
   w.trail *= 0.9
   const Tn = tempAt(w, w.chambers[w.queen.room]!.cy), q10 = Math.pow(2, (Tn - 20) / 10)
   w.carb -= (Wn * 0.03 + Mn * 0.045) * q10
   let starving = false; if (w.carb < 0) { w.carb = 0; starving = true }
   // 창고가 담을 수 있는 만큼만 남는다. 창고는 굴착(편집)으로 늘어난다.
   const stores = w.chambers.filter(c => c.type === 'store').length
-  w.carb = Math.min(w.carb, 60 + stores * 90); w.prot = Math.min(w.prot, 30 + stores * 45)
+  const sk = SP(w).storeK; w.carb = Math.min(w.carb, (60 + stores * 90) * sk); w.prot = Math.min(w.prot, (30 + stores * 45) * sk)
   const larvae = bcount(w, 'larva')
   const need = larvae * 0.06 * Math.max(0.2, q10), fed = Math.min(w.prot, need); w.prot -= fed
   for (const b of w.brood) if (b.st === 'larva') b.prot += fed * (b.n / Math.max(0.1, larvae))
@@ -192,11 +248,13 @@ function dayTick(w: World) {
   const fT = Tn < 12 ? 0 : Tn < 22 ? (Tn - 12) / 10 : Tn < 30 ? 1 : 0
   const fP = clamp(w.prot / (5 + Wn * 0.05), 0, 1) * 0.7 + 0.3
   const fF = clamp(w.carb / (Wn * 0.6 + 10), 0.3, 1.6)
-  const lay = s === 3 ? 0 : (3 + Math.min(30, Wn * 0.07)) * fT * fP * fF * (w.queen.health / 100)
+  // 늙은 여왕은 수명의 70%를 넘기면서 산란이 줄어든다
+  const qy = queenYears(w), life = SP(w).life, old = qy > life * 0.7 ? clamp(1 - (qy - life * 0.7) / (life * 0.3), 0.1, 1) : 1
+  const lay = s === 3 && isWinter(w) ? 0 : (3 + Math.min(30, Wn * 0.07)) * fT * fP * fF * old * SP(w).layK * (w.queen.health / 100)
   if (lay > 0.15) { w.prot = Math.max(0, w.prot - lay * 0.05); const br = w.chambers.find(c => c.type === 'brood'); w.brood.push({ st: 'egg', n: lay, dev: 0, prot: 0, room: br ? br.id : w.queen.room }) }
   for (const c of w.cohorts) {
     const L = c.kind === 'm' ? 180 : 140
-    let h = (1 / L) * clamp(q10, 0.4, 1.8) * (s === 3 ? 0.3 : 1) + (starving ? 0.035 : 0)
+    let h = (1 / L) * clamp(q10, 0.4, 1.8) * (isWinter(w) ? 0.3 : 1) + (starving ? 0.035 : 0)
     if (c.age > L * 1.6) h += 0.05
     c.n *= 1 - Math.min(0.2, h); c.age++
   }
@@ -204,21 +262,35 @@ function dayTick(w: World) {
   for (const c of w.cohorts) { const m = merged.find(x => x.kind === c.kind && Math.abs(x.age - c.age) < 4); if (m) { m.age = (m.age * m.n + c.age * c.n) / (m.n + c.n); m.n += c.n } else if (c.n > 0.05) merged.push({ ...c }) }
   w.cohorts = merged
   if (starving) say(w, '단물이 바닥났다. 굶는 개미가 생긴다.', 'The honeydew ran out. Ants are starving.')
-  if (s === 3) {
+  if (isWinter(w)) {
     const r = w.chambers[w.queen.room]!
     if (tempAt(w, r.cy) < 0.5) { for (const c of w.cohorts) c.n *= 0.985; say(w, '동결선이 겨울방까지 내려왔다. 얼어 죽는 개미가 생긴다.', 'The frost line reached the winter chamber. Some ants froze.') }
+  }
+  // 여왕의 나이, 결혼비행, 수명
+  w.queen.age++
+  const pop = workers(w) + majors(w); if (pop > w.peak) w.peak = pop
+  const year = Math.floor((w.ep - 1) / 4)
+  if (s === 1 && w.day === 5 && pop >= SP(w).flightPop && queenYears(w) >= 1.5 && w.flownYear !== year) {
+    const n = Math.round(pop * 0.05)
+    w.alates += n; w.flownYear = year; w.flight = 24; w.carb = Math.max(0, w.carb - n * 0.5); w.prot = Math.max(0, w.prot - n * 0.3)
+    say(w, `결혼비행. 날개 달린 신여왕과 수개미 ${n}마리가 하늘로 날아올랐다. 이 군락의 다음 세대가 될 수 있다.`, `Nuptial flight. ${n} winged queens and males took to the sky. One of them may carry this colony on.`)
+  }
+  if (queenYears(w) >= SP(w).life * 0.85 && !w.over && w.day === 1) say(w, '여왕이 많이 늙었다. 알을 거의 낳지 못한다.', 'The queen has grown very old. She barely lays now.')
+  if (queenYears(w) >= SP(w).life || (pop < 1 && w.brood.length === 0)) {
+    w.over = true
+    say(w, w.alates > 0 ? '여왕이 죽었다. 결혼비행을 떠났던 신여왕 하나가 다음 세대를 연다.' : '여왕이 죽고 군락이 흩어졌다.', w.alates > 0 ? 'The queen has died. One of the queens from the nuptial flight begins the next generation.' : 'The queen has died and the colony scattered.')
   }
   w.day++
   if (w.day > epDays(w)) {
     w.ep++; w.day = 1
     const ns = season(w)
-    if (ns === 3) {
+    if (ns === 3 && SP(w).climate !== 'tropical') {
       let deep = w.chambers[0]!; for (const c of w.chambers) if (c.type !== 'waste' && c.cy > deep.cy) deep = c
       w.queen.room = deep.id; for (const b of w.brood) b.room = deep.id
       for (const b of w.brood) if (b.st === 'egg') b.n = 0
       say(w, `겨울. 여왕과 애벌레를 지하 ${(deep.cy - SURF) * CM}cm 방으로 옮기고 모두 몸을 맞대 멈췄다.`, `Winter. The queen and larvae moved to the chamber ${(deep.cy - SURF) * CM}cm down, and everyone huddled still.`)
-    } else if (ns === 0) { w.queen.room = w.queen.home; say(w, `${epName(w.ep)}. 땅이 데워지면 여왕이 다시 알을 낳는다.`, `${epName(w.ep, 'en')}. Once the soil warms, the queen lays again.`) }
-    else say(w, `${epName(w.ep)}이 시작됐다.`, `${epName(w.ep, 'en')} begins.`)
+    } else if (ns === 0) { w.queen.room = w.queen.home; say(w, `${epName(w.ep, 'ko', w)}. 땅이 데워지면 여왕이 다시 알을 낳는다.`, `${epName(w.ep, 'en', w)}. Once the soil warms, the queen lays again.`) }
+    else say(w, `${epName(w.ep, 'ko', w)}이 시작됐다.`, `${epName(w.ep, 'en', w)} begins.`)
   }
 }
 
@@ -227,8 +299,9 @@ export function hourTick(w: World) {
   broodHour(w)
   if (w.tick % 6 === 0) relocateBrood(w)
   if (w.rain > 0) w.rain--
-  if (w.digQueue > 0 && season(w) !== 3) { const n = Math.min(3, w.digQueue); for (let k = 0; k < n; k++) digStep(w); w.digQueue -= n }
-  else if (season(w) !== 3 && rnd() < 0.15) digStep(w)
+  if (w.flight > 0) w.flight--
+  if (w.digQueue > 0 && !isWinter(w)) { const n = Math.min(3, w.digQueue); for (let k = 0; k < n; k++) digStep(w); w.digQueue -= n }
+  else if (!isWinter(w) && rnd() < 0.15) digStep(w)
   threatHour(w)
   if (w.tick % 24 === 0) dayTick(w)
 }
@@ -306,7 +379,7 @@ export function syncAnts(w: World, ants: Ant[]) {
 }
 
 export function sendForager(w: World, ants: Ant[], carry: 1 | 2) {
-  if (season(w) === 3) return
+  if (isWinter(w)) return
   const a = ants.find(x => x.kind === 'w' && x.st === 'in' && x.job === 'idle')
   if (!a) return
   const tree = w.trees[Math.floor(rnd() * w.trees.length)]!
@@ -336,7 +409,7 @@ export function moveAnts(w: World, ants: Ant[]) {
       return
     }
     if (w.grid[idx(a.x, a.y)] !== TUN) { a.x = qr.cx; a.y = qr.cy }
-    if (s === 3) { step(w, a, qr.cx + Math.round((rnd() - 0.5) * qr.rx * 2), qr.cy, 0.8); return }
+    if (isWinter(w)) { step(w, a, qr.cx + Math.round((rnd() - 0.5) * qr.rx * 2), qr.cy, 0.8); return }
     if (cen && (a.kind === 'm' || Math.abs(a.x - cen.x) + Math.abs(a.y - cen.y) <= cen.alarmR)) { a.job = 'swarm'; step(w, a, cen.x, cen.y, 0.97); return }
     if (a.job === 'swarm') a.job = a.kind === 'm' ? 'guard' : 'idle'
     if (a.job === 'forage') { if (a.y <= SURF) { a.st = 'out'; a.y = SURF - 1 } else step(w, a, ex, SURF, 0.9); return }
@@ -363,7 +436,7 @@ export function farmFor(w: World, server: string) {
   return w.trees[0]!
 }
 export function sendTo(w: World, ants: Ant[], x: number, h: number, carry: 1 | 2) {
-  if (season(w) === 3) return
+  if (isWinter(w)) return
   const a = ants.find(o => o.kind === 'w' && o.st === 'in' && o.job === 'idle'); if (!a) return
   a.job = 'forage'; a.carry = 0; a.t = carry; a.tx = x; a.climb = Math.max(0, h - 2); a.up = 0
 }
