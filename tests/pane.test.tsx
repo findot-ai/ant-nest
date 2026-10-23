@@ -12,6 +12,7 @@ test('the nest pane draws on every surface', async ($, on) => {
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('tool.call', () => ({ result: {} }))
+  on('clock.every', () => ({ value: undefined }))
   const store: Record<string, unknown> = {}
   on('store.get', (_, e) => ({ value: store[(e as { key: string }).key] }))
   on('store.set', (_, e) => { const x = e as { key: string; value: unknown }; store[x.key] = x.value; return { value: undefined } })
@@ -25,9 +26,14 @@ test('the nest pane draws on every surface', async ($, on) => {
   await $.tool.call({ tool: 'Read', file_path: '/x' })
   for (const surface of ['desktop', 'terminal', 'mobile', 'vscode'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
-    const head = await ui.find({ type: 'Text', text: /ANT POP/ })
-    expect(head?.text).toContain('ANT POP')
+    expect((await ui.find({ type: 'Text', text: /🐜/ }))?.text).toContain('🐜')
     if (surface !== 'terminal') expect(await ui.find({ type: 'Svg' })).toBeDefined()
+    if (surface === 'mobile' || surface === 'desktop') {
+      for (const k of ['log', 'dex', 'line', 'dash']) { await ui.press({ key: `tab-${k}` }); expect(await ui.find({ type: 'Text' })).toBeDefined() }
+      await ui.press({ key: 'tab-dex' }); expect((await ui.find({ type: 'Text', text: /발견|Found/ }))).toBeDefined()
+      await ui.press({ key: 'tab-line' }); expect((await ui.find({ type: 'Text', text: /세대|Generation/ }))).toBeDefined()
+      await ui.press({ key: 'tab-dash' })
+    }
     await ui.unmount()
   }
 })

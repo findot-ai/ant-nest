@@ -1,9 +1,9 @@
 import { atom, read, update } from 'claude-code'
-import type { Register } from 'claude-code'
+import type { Register, RenderChildren } from 'claude-code'
 
 import {
   newWorld, hourTick, moveAnts, syncAnts, sendForager, sendDigger, spawnSpider, spawnCentipede, defeatCentipede, farmFor, sendTo,
-  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid,
+  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid, capacity, isWinter,
 } from './engine'
 import { emptyProfile, scanTranscript, scanHistory, scanSettings, pickSetup } from './profile'
 import { SPECIES, SPECIES_IDS } from './species'
@@ -11,13 +11,15 @@ import { GUESTS, RARITY_KO, RARITY_EN, guestById } from './guests'
 import type { GuestId } from './guests'
 import type { SpeciesId } from './species'
 import type { World, Ant, Tally, Lang, LogLine } from './engine'
-import { svg, raster } from './render'
+import { svg, raster, visibleRows } from './render'
+import { W } from './engine'
 import { classify, colonyType, isTestLike } from './usage'
 
 const PANE = 'ant-nest'
 // 접속 75초 = 게임 1시간, 접속 30분 = 게임 하루, 약 35시간 = 게임 1년. 한 세대(여왕 수명 5~10년)는 매일 쓰면 현실 약 3개월
 const FRAME_MS = 500, FRAMES_PER_HOUR = 150
 const view = atom({ plugin: 'ant-nest', key: 'view' } as const, { frame: 0 })
+const tabAtom = atom({ plugin: 'ant-nest', key: 'tab' } as const, 'dash')
 
 
 // 화면 글자: 언어별 한 벌씩
@@ -59,6 +61,7 @@ export const register: Register = (on, options) => {
   const line = (l: LogLine) => (lang === 'en' ? `${seasonName(w, l.s, 'en')} d${l.d} · ${l.en}` : `${seasonName(w, l.s, 'ko')} ${l.d}일 · ${l.ko}`)
   const when = () => `${epName(w.ep, lang, w)} ${Math.min(w.day, epDays(w))}${T.day}`
   const spName = (id: SpeciesId) => (lang === 'en' ? SPECIES[id].en : SPECIES[id].ko)
+  const isWinterNow = () => isWinter(w)
   const badge = () => `${spName(w.species)} · ${T.gen(w.gen)} · ${T.level}${colonyLevel(w)} · ${T.queen(queenYears(w), SP(w).life)}`
 
   let w: World = newWorld()
@@ -254,35 +257,113 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     await read($, view)
-    const pop = Math.round(workers(w) + majors(w)), hr = hour(w)  // h는 JSX 함수 이름이라 쓰지 않는다
+    const tab = await read($, tabAtom)
+    const en = lang === 'en', sp = SP(w), pop = Math.round(workers(w) + majors(w)), hr = hour(w)  // h는 JSX 함수 이름이라 쓰지 않는다
     const clock = `${hr < 12 ? T.am : T.pm} ${hr % 12 === 0 ? 12 : hr % 12}${T.hourSuffix}`
-    const head = `ANT POP ${pop} · ${when()} · ${clock} · ${airT(w).toFixed(0)}°C`
-    const caste = SP(w).dulotic ? (lang === 'en' ? `Samurai ${Math.round(raiders(w))} · Slaves (wood ants) ${Math.round(slaves(w))}` : `사무라이 ${Math.round(raiders(w))} · 노예(곰개미) ${Math.round(slaves(w))}`) : `${T.workers} ${Math.round(workers(w))}`
-    const phase = SP(w).bivouac ? (armyPhase(w) === 'statary' ? (lang === 'en' ? ' · Statary phase' : ' · 정착기') : (lang === 'en' ? ' · Nomadic phase' : ' · 유랑기')) : w.raid ? (lang === 'en' ? ' · ⚔ Raid out' : ' · ⚔ 노예사냥 중') : ''
-    const stats = `${caste} · ${T.majors} ${Math.round(majors(w))} · ${T.egg} ${Math.round(bcount(w, 'egg'))} · ${T.larva} ${Math.round(bcount(w, 'larva'))} · ${T.pupa} ${Math.round(bcount(w, 'pupa'))} · ${T.carb} ${Math.round(w.carb)} · ${T.prot} ${Math.round(w.prot)}${phase}`
-    const t = w.today
-    const usage = `${T.today} · ${T.explore} ${t.explore} · ${T.build} ${t.build} · ${T.hunt} ${t.hunt} · ${T.raise} ${t.raise} · ${T.bugs} ${t.bugs} (${T.fixed} ${t.fixed})`
+    const bar = (v: number, max: number, n = 10) => { const k = Math.max(0, Math.min(n, Math.round((v / Math.max(1, max)) * n))); return '█'.repeat(k) + '░'.repeat(n - k) }
     let picture
     if (e.surface === 'terminal') {
       const { Raster } = $.ui.resolve(e as typeof e & { surface: 'terminal' })
       picture = <Raster key="nest" {...raster(w, ants)} />
     } else if (e.surface === 'desktop' || e.surface === 'mobile' || e.surface === 'vscode') {
       const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
-      picture = <Svg source={svg(w, ants, lang)} alt={T.alt(pop)} width={288} height={384} />
+      const pw = Math.round(Math.max(260, Math.min(900, (e.props.bodyColumns || 60) * 8 - 8)))
+      picture = <Svg source={svg(w, ants, lang, pw)} alt={T.alt(pop)} width={pw} height={Math.round((pw * visibleRows(w)) / W)} />
     }
-    return (
+    // 위협 알림 띠
+    const threats = w.threats.map(x => (x.k === 'centipede' ? (en ? `⚠ Centipede inside: make the failing ${x.tool} call succeed to drive it out` : `⚠ 지네 침입: 실패하던 ${x.tool}를 다시 성공시키면 물리칩니다`) : (en ? '⚠ Spider web on the trail: fix the error to cut it down' : '⚠ 길목에 거미줄: 오류를 고치면 걷어 냅니다')))
+    if (w.raid) threats.push(en ? '⚔ The samurai raiders are out on a slave raid' : '⚔ 사무라이개미 습격대가 노예사냥을 나갔습니다')
+    if (sp.bivouac) threats.push(armyPhase(w) === 'statary' ? (en ? '⛺ Statary phase: the queen lays in a burst' : '⛺ 정착기: 여왕이 한꺼번에 알을 낳습니다') : (en ? '🧭 Nomadic phase: the colony moves every night' : '🧭 유랑기: 밤마다 자리를 옮깁니다'))
+    if (isWinterNow()) threats.push(en ? '❄ Winter: the ants are huddled deep. AI use is stored as reserves' : '❄ 겨울: 개미들이 깊은 방에서 멈춰 있습니다. 이 동안의 AI 활용은 비축으로 쌓입니다')
+
+    const card = (title: string, body: RenderChildren) => (
+      <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1} flexGrow={1} minWidth={26}>
+        <Text size="caption" weight="semibold" dimColor>{title}</Text>
+        {body}
+      </Box>
+    )
+    const row = (label: string, value: string, b?: string) => (
+      <Box justifyContent="space-between" gap={1}><Text size="footnote">{label}</Text><Text size="footnote" mono tabular>{b ? `${b} ` : ''}{value}</Text></Box>
+    )
+    const cap = capacity(w), t = w.today
+    const usageRows: [string, number][] = [[T.exploreS, t.explore], [T.buildS, t.build], [T.huntS, t.hunt], [en ? 'Raise' : '육성', t.raise], [en ? 'Herd (MCP)' : '목축(MCP)', t.mcp], [en ? 'Trail (skill)' : '길(스킬)', t.skill], [en ? 'Instinct (auto)' : '본능(자동화)', t.auto], [en ? 'Expedition' : '원정(병렬)', t.parallel]]
+    const umax = Math.max(5, ...usageRows.map(r => r[1]))
+
+    const dashboard = (
+      <Box flexDirection="row" flexWrap="wrap" gap={1}>
+        {card(en ? 'Colony' : '군락', <Box flexDirection="column">
+          {sp.dulotic ? row(en ? 'Samurai' : '사무라이', String(Math.round(raiders(w)))) : row(T.workers, String(Math.round(workers(w))))}
+          {sp.dulotic ? row(en ? 'Slaves (wood ants)' : '노예(곰개미)', String(Math.round(slaves(w)))) : row(T.majors, String(Math.round(majors(w))))}
+          {row(en ? 'Eggs · larvae · pupae' : '알 · 애벌레 · 고치', `${Math.round(bcount(w, 'egg'))} · ${Math.round(bcount(w, 'larva'))} · ${Math.round(bcount(w, 'pupa'))}`)}
+          {row(en ? 'Rooms · depth' : '방 · 깊이', `${w.chambers.length} · ${(w.deepest - 12) * 3}cm`)}
+        </Box>)}
+        {card(en ? 'Stores' : '비축', <Box flexDirection="column">
+          {row(sp.storeKo ? (en ? sp.storeEn! : sp.storeKo) : T.carb, `${Math.round(w.carb)}/${Math.round(cap.carb)}`, bar(w.carb, cap.carb))}
+          {row(T.prot, `${Math.round(w.prot)}/${Math.round(cap.prot)}`, bar(w.prot, cap.prot))}
+          {row(en ? 'Instinct (automation)' : '본능(자동화)', `Lv ${w.instinct.toFixed(1)}`, bar(w.instinct, 10))}
+          {row(en ? 'Pheromone trail' : '페로몬 길', `${w.trail.toFixed(1)}`, bar(w.trail, 3))}
+        </Box>)}
+        {card(T.today, <Box flexDirection="column">
+          {usageRows.filter(([, v], k) => v > 0 || k < 3).map(([label, v]) => row(label, String(v), bar(v, umax, 8)))}
+          {row(en ? 'Bugs (fixed)' : '버그 (해결)', `${t.bugs} (${t.fixed})`)}
+        </Box>)}
+        {card(en ? 'Queen & line' : '여왕과 혈통', <Box flexDirection="column">
+          {row(en ? 'Queen age' : '여왕 나이', `${queenYears(w).toFixed(1)}/${sp.life}${en ? 'y' : '년'}`, bar(queenYears(w), sp.life))}
+          {row(en ? 'Generation · level' : '세대 · 레벨', `${T.gen(w.gen)} · Lv${colonyLevel(w)}`)}
+          {row(en ? 'Colony type' : '군락 유형', colonyType(w.total, lang).split(':')[0]!)}
+          {row(en ? 'Guest dex' : '손님 도감', `${Object.keys(w.dex).length}/${GUESTS.length}`)}
+        </Box>)}
+      </Box>
+    )
+    const history = (
+      <Box flexDirection="column" gap={0}>
+        {w.log.slice(-18).reverse().map((l, k) => (
+          <Box gap={1}><Text size="caption" dimColor mono>{(en ? `${seasonName(w, l.s, 'en').slice(0, 6)} d${l.d}` : `${seasonName(w, l.s, 'ko')} ${l.d}일`).padEnd(8)}</Text><Text size="footnote" dimColor={k > 0}>{en ? l.en : l.ko}</Text></Box>
+        ))}
+      </Box>
+    )
+    const dex = (
       <Box flexDirection="column">
-        <Text bold>{head}</Text>
-        <Text dimColor>{badge()}</Text>
+        <Text size="footnote" dimColor>{en ? `Found ${Object.keys(w.dex).length} of ${GUESTS.length}. Guests now visiting: ` : `${GUESTS.length}종 중 ${Object.keys(w.dex).length}종 발견. 지금 방문 중: `}{w.guests.length ? w.guests.map(g => (en ? guestById(g.id).en : guestById(g.id).ko)).join(', ') : (en ? 'none' : '없음')}</Text>
+        {GUESTS.map(g => {
+          const d = w.dex[g.id], r = en ? RARITY_EN[g.rarity] : RARITY_KO[g.rarity], stars = '★'.repeat(g.rarity) + '☆'.repeat(4 - g.rarity)
+          const host = g.hosts === 'all' ? (en ? 'any species' : '모든 종') : g.hosts.map(spName).join(', ')
+          return d
+            ? <Box flexDirection="column" marginTop={1}><Text size="footnote" weight="semibold">✔ {en ? g.en : g.ko} <Text dimColor>{stars} {r} · ×{d.n}</Text></Text><Text size="caption" dimColor>{en ? g.enDesc : g.koDesc}</Text></Box>
+            : <Box marginTop={1}><Text size="footnote" dimColor>？ ???? {stars} {r} · {en ? 'lives with' : '사는 곳'}: {host}</Text></Box>
+        })}
+      </Box>
+    )
+    const lineage = (
+      <Box flexDirection="column" gap={1}>
+        <Text size="footnote">{spName(w.species)} <Text dimColor>({sp.sci})</Text></Text>
+        <Text size="caption" dimColor>{en ? sp.enDesc : sp.koDesc}</Text>
+        <Text size="footnote">{en ? 'Starting analysis' : '시작 분석'}</Text>
+        <Text size="caption" dimColor>{(en ? w.origin.en : w.origin.ko) || '-'}{w.gift ? ` · ${en ? 'adopted from gift' : '선물받은 여왕'} ${w.gift}` : ''}</Text>
+        <Text size="footnote">{en ? 'Generations' : '세대 기록'}</Text>
+        {w.lineage.length === 0 && <Text size="caption" dimColor>{en ? 'This is the first generation.' : '첫 세대입니다.'}</Text>}
+        {w.lineage.map(l => <Text size="caption" dimColor>{T.gen(l.gen)} · {spName(l.species)} · {l.years}{en ? 'y' : '년'} · {en ? 'peak' : '최대'} {l.peak} · {l.ended === 'succession' ? (en ? 'carried on' : '계승') : (en ? 'scattered' : '소멸')}</Text>)}
+        <Text size="caption" dimColor>{en ? 'Now' : '지금'}: {T.gen(w.gen)} · {en ? 'peak' : '최대'} {Math.round(w.peak)} · Lv{colonyLevel(w)}</Text>
+      </Box>
+    )
+    const TABS: [string, string][] = [['dash', en ? 'Dashboard' : '대시보드'], ['log', en ? 'History' : '기록'], ['dex', en ? 'Dex' : '도감'], ['line', en ? 'Lineage' : '혈통']]
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Box flexDirection="column">
+          <Box justifyContent="space-between" flexWrap="wrap" gap={1}>
+            <Text size="heading" weight="bold">🐜 {pop} <Text size="footnote" dimColor>{en ? 'ants' : '마리'}</Text></Text>
+            <Text size="footnote" dimColor>{when()} · {clock} · {airT(w).toFixed(0)}°C</Text>
+          </Box>
+          <Text size="caption" dimColor>{badge()}</Text>
+        </Box>
         {picture}
-        <Text dimColor>{stats}</Text>
-        <Text>{usage}</Text>
-        <Text dimColor>{T.more(t)} · {T.type}: {colonyType(w.total, lang)}</Text>
-        <Text dimColor>{lang === 'en' ? 'Guest dex' : '손님 도감'} {Object.keys(w.dex).length}/{GUESTS.length}{w.guests.length ? ` · ${lang === 'en' ? 'Visiting' : '방문 중'}: ${w.guests.map(g => (lang === 'en' ? guestById(g.id).en : guestById(g.id).ko)).join(', ')}` : ''}</Text>
-        {w.log.slice(-3).map(l => <Text dimColor>{line(l)}</Text>)}
-        {season(w) === 3 && <Text dimColor>{T.winter}</Text>}
+        {threats.map(x => <Text size="footnote" color={x.startsWith('⚠') ? 'error' : 'warning'}>{x}</Text>)}
+        <Box gap={1} flexWrap="wrap">
+          {TABS.map(([k, label]) => <Button key={`tab-${k}`} label={label} variant={tab === k ? 'primary' : 'secondary'} onPress={() => update($, tabAtom, () => k)} />)}
+        </Box>
+        {tab === 'log' ? history : tab === 'dex' ? dex : tab === 'line' ? lineage : dashboard}
       </Box>
     )
   })

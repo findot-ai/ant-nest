@@ -466,7 +466,14 @@ export function moveAnts(w: World, ants: Ant[]) {
 }
 
 // ---------- 외부 목초지(MCP 서버 하나 = 진딧물 나무 하나) ----------
-export function farmFor(w: World, server: string) {
+// MCP 서버 이름을 목초지 이름으로: 내부 ID처럼 생긴 이름은 짧게 줄인다
+export function prettyServer(name: string) {
+  const n = name.replace(/^(mcp|server|plugin)[-_]/i, '')
+  if (/^[0-9a-f]{8}(-[0-9a-f]{2,})*/i.test(n) || /^[0-9a-f-]{16,}$/i.test(n)) return `MCP·${n.slice(0, 4)}`
+  return n.length > 14 ? n.slice(0, 13) + '…' : n
+}
+export function farmFor(w: World, rawServer: string) {
+  const server = prettyServer(rawServer)
   const t = w.trees.find(x => x.farm === server)
   if (t) return t
   if (w.trees.length >= 7) return w.trees[Math.floor(rnd() * w.trees.length)]!
@@ -551,4 +558,10 @@ function guestDay(w: World) {
     say(w, `손님이 찾아왔다: ${def.ko} (${RARITY_KO[def.rarity]}). ${def.koDesc}`, `A guest arrived: ${def.en} (${RARITY_EN[def.rarity]}). ${def.enDesc}`)
     break
   }
+}
+
+// 창고가 담을 수 있는 양 (대시보드 막대용)
+export function capacity(w: World) {
+  const stores = w.chambers.filter(c => c.type === 'store').length, sk = SP(w).storeK
+  return { carb: (60 + stores * 90) * sk, prot: (30 + stores * 45) * sk }
 }

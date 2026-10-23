@@ -1,4 +1,4 @@
-import { W, H, SURF, CM, SKY, SOIL, TUN, ROCK, ROOMNAME, ROOMNAME_EN, SP, idx, layerOf, season, hour, chamberAt, frostDepth } from './engine'
+import { W, H, SURF, CM, SKY, SOIL, TUN, ROCK, ROOMNAME, ROOMNAME_EN, SP, prettyServer, idx, layerOf, season, hour, chamberAt, frostDepth } from './engine'
 import type { World, Ant, Lang } from './engine'
 
 const SOILC = ['#563a26', '#a47646', '#805e44', '#625852']
@@ -68,7 +68,10 @@ const hash = (x: number, y: number) => { let h = (x * 374761393 + y * 668265263)
 const SOILD = ['#4a3020', '#8e6339', '#6e5038', '#544b46'], SOILL = ['#644230', '#b5865a', '#8c6a4f', '#6c625c']
 const L_BG = 0, L_TERR = 1, L_EDGE = 2, L_ITEM = 3, L_ANT = 4, L_FX = 5, L_TXT = 6
 
-export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
+// 실제로 판 깊이까지만 보여 준다 (군락이 깊어지면 화면도 따라 내려간다)
+export const visibleRows = (w: World) => Math.min(H, Math.max(SURF + 26, w.deepest + 9))
+
+export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
   const sp = SP(w)
   const RN = { ...(lang === 'en' ? ROOMNAME_EN : ROOMNAME), ...(sp.storeKo ? { store: lang === 'en' ? sp.storeEn! : sp.storeKo } : {}) }
   const s = season(w), nt = night(w), h = hour(w), P = new Painter(7), WW = W * S, HH = H * S, GY = SURF * S
@@ -275,11 +278,14 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
   }
   label(sp.bivouac ? (lang === 'en' ? 'Bivouac (living nest)' : '비박 (살아 있는 둥지)') : lang === 'en' ? 'Queen' : '여왕', q.cx * S + 3, (q.cy - q.ry) * S - 2, '#1a120a', '#e3a33b')
   for (const c of w.chambers) if (c.type !== 'queen') label(RN[c.type], c.cx * S + 3, (c.cy - c.ry) * S - 2, '#efe4d2', 'rgba(20,14,10,.72)')
-  for (const t of w.trees) if (t.farm) label(t.farm.slice(0, 14), t.x * S, GY + 10, '#eaf5df', 'rgba(30,60,30,.8)')
+  w.trees.filter(t => t.farm).forEach((t, k) => label(prettyServer(t.farm!), t.x * S, GY + 10 + (k % 2) * 11, '#eaf5df', 'rgba(30,60,30,.8)'))
   if (fd > 0) label(`${lang === 'en' ? 'Frost line' : '동결선'} ${fd}cm`, WW - 40, GY + (fd / CM) * S - 2, '#0b1a2a', 'rgba(220,240,255,.9)')
   // 깊이 눈금
-  for (let d = 15; d < (H - SURF) * CM; d += 15) { const y = (SURF + d / CM) * S; P.rect(L_TXT, 0, y, 4, 1, 'rgba(255,255,255,.45)'); P.raw(L_TXT, `<text x="6" y="${y + 3}" font-size="6" fill="rgba(255,255,255,.55)">${d}cm</text>`) }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WW} ${HH}" width="${WW}" height="${HH}" shape-rendering="crispEdges" font-family="monospace"><defs>${defs.join('')}</defs>${P.out()}</svg>`
+  const VR = visibleRows(w)
+  for (let d = 15; d < (VR - SURF) * CM; d += 15) { const y = (SURF + d / CM) * S; P.rect(L_TXT, 0, y, 4, 1, 'rgba(255,255,255,.45)'); P.raw(L_TXT, `<text x="6" y="${y + 3}" font-size="6" fill="rgba(255,255,255,.55)">${d}cm</text>`) }
+  const VH = VR * S, outH = Math.round((width * VH) / WW)
+  void HH
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WW} ${VH}" width="${width}" height="${outH}" shape-rendering="crispEdges" font-family="monospace"><defs>${defs.join('')}</defs>${P.out()}</svg>`
 }
 
 // ---------- 터미널: 반 블록(▀) 한 글자에 위아래 두 칸 ----------
@@ -288,10 +294,10 @@ export function raster(w: World, ants: Ant[]) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px[idx(x, y)] = cellColor(w, x, y)
   for (const t of w.trees) for (let y = SURF - t.h; y < SURF; y++) px[idx(t.x, y)] = '#4a3324'
   for (const sp of sprites(w, ants)) if (sp.x >= 0 && sp.x < W && sp.y >= 0 && sp.y < H) px[idx(sp.x, sp.y)] = sp.c
-  const rows = H / 2, words = new Uint32Array(W * rows * 3)
+  const rows = Math.ceil(visibleRows(w) / 2), words = new Uint32Array(W * rows * 3)
   for (let ry = 0; ry < rows; ry++) for (let x = 0; x < W; x++) {
     const o = (ry * W + x) * 3
-    words[o] = 0x2580; words[o + 1] = parseInt(px[idx(x, ry * 2)]!.slice(1, 7), 16); words[o + 2] = parseInt(px[idx(x, ry * 2 + 1)]!.slice(1, 7), 16)
+    words[o] = 0x2580; words[o + 1] = parseInt(px[idx(x, ry * 2)]!.slice(1, 7), 16); words[o + 2] = parseInt((px[idx(x, Math.min(H - 1, ry * 2 + 1))] ?? '#000000').slice(1, 7), 16)
   }
   const bytes = new Uint8Array(words.buffer) as Uint8Array & { toBase64: () => string }
   return { cells: bytes.toBase64(), columns: W, rows }
