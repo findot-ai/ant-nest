@@ -78,7 +78,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     const saved = (await $.store.get('world')) as World | undefined
-    if (saved && saved.v === 4 && Array.isArray(saved.grid)) { w = saved; say(w, '다시 접속했다. 개미들이 하던 일을 이어 간다.', 'You are back. The ants pick up where they left off.') }
+    if (saved && saved.v === 4 && Array.isArray(saved.grid)) { w = saved; w.guests ??= []; w.dex ??= {}; w.newDex ??= []; w.lineage ??= []; say(w, '다시 접속했다. 개미들이 하던 일을 이어 간다.', 'You are back. The ants pick up where they left off.') }
     else {
       // 처음 설치: 이 컴퓨터의 Claude Code 기록을 로컬에서만 훑어 시작 군락을 정한다 (개수만 세고 원문은 남기지 않음)
       const p = emptyProfile()
@@ -256,8 +256,8 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
     await read($, view)
-    const pop = Math.round(workers(w) + majors(w)), h = hour(w)
-    const clock = `${h < 12 ? T.am : T.pm} ${h % 12 === 0 ? 12 : h % 12}${T.hourSuffix}`
+    const pop = Math.round(workers(w) + majors(w)), hr = hour(w)  // h는 JSX 함수 이름이라 쓰지 않는다
+    const clock = `${hr < 12 ? T.am : T.pm} ${hr % 12 === 0 ? 12 : hr % 12}${T.hourSuffix}`
     const head = `ANT POP ${pop} · ${when()} · ${clock} · ${airT(w).toFixed(0)}°C`
     const caste = SP(w).dulotic ? (lang === 'en' ? `Samurai ${Math.round(raiders(w))} · Slaves (wood ants) ${Math.round(slaves(w))}` : `사무라이 ${Math.round(raiders(w))} · 노예(곰개미) ${Math.round(slaves(w))}`) : `${T.workers} ${Math.round(workers(w))}`
     const phase = SP(w).bivouac ? (armyPhase(w) === 'statary' ? (lang === 'en' ? ' · Statary phase' : ' · 정착기') : (lang === 'en' ? ' · Nomadic phase' : ' · 유랑기')) : w.raid ? (lang === 'en' ? ' · ⚔ Raid out' : ' · ⚔ 노예사냥 중') : ''
