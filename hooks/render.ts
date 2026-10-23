@@ -71,7 +71,9 @@ const L_BG = 0, L_TERR = 1, L_EDGE = 2, L_ITEM = 3, L_ANT = 4, L_FX = 5, L_TXT =
 // 실제로 판 깊이까지만 보여 준다 (군락이 깊어지면 화면도 따라 내려간다)
 export const visibleRows = (w: World) => Math.min(H, Math.max(SURF + 26, w.deepest + 9))
 
-export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
+export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288, fr = 0, phase = 0) {
+  // fr: 0.5초마다 오르는 프레임 수 (빗방울·행렬처럼 빠른 움직임), phase: 게임 1시간 안에서의 진행 (0~1)
+  const tt = w.tick + phase
   const sp = SP(w)
   const RN = { ...(lang === 'en' ? ROOMNAME_EN : ROOMNAME), ...(sp.storeKo ? { store: lang === 'en' ? sp.storeEn! : sp.storeKo } : {}) }
   const s = season(w), nt = night(w), h = hour(w), P = new Painter(7), WW = W * S, HH = H * S, GY = SURF * S
@@ -90,7 +92,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
   }
   // 구름
   for (let k = 0; k < 3; k++) {
-    const cx = ((hash(k, 9) * WW + w.tick * (0.3 + k * 0.15)) % (WW + 60)) - 30, cy = 12 + k * 14
+    const cx = ((hash(k, 9) * WW + tt * (0.6 + k * 0.3)) % (WW + 60)) - 30, cy = 12 + k * 14
     const cc = w.rain > 0 ? mix('#8a959c', '#000000', nt * 0.5) : mix('#ffffff', '#5a6080', nt * 0.7)
     P.rect(L_BG, cx, cy, 30, 6, cc); P.rect(L_BG, cx + 6, cy - 4, 16, 5, cc); P.rect(L_BG, cx + 4, cy + 6, 22, 2, mix(cc, '#000000', 0.08))
   }
@@ -234,7 +236,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
   if (w.raid) {
     const ex = w.grid.findIndex((g, i) => i >= SURF * W && i < (SURF + 1) * W && g === TUN) - SURF * W, back = w.raid.t <= 3
     for (let k = 0; k < 14; k++) {
-      const prog = ((w.tick * 7 + k * 9) % 60) / 60, x = back ? WW - prog * (WW - ex * S) : ex * S + prog * (WW - ex * S), y = GY - 6
+      const prog = ((fr * 0.6 + k * 9) % 60) / 60, x = back ? WW - prog * (WW - ex * S) : ex * S + prog * (WW - ex * S), y = GY - 6
       P.rect(L_FX, x, y + 1, 3, 3, sp.body); P.rect(L_FX, x + (back ? -2 : 3), y + 1, 2, 2, sp.body); P.rect(L_FX, x + (back ? -3 : 5), y, 3, 3, sp.major)
       if (back) P.rect(L_FX, x - 5, y - 1, 3, 4, '#efe2c8')
     }
@@ -255,13 +257,21 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
     }
   }
   // 결혼비행: 날개 달린 신여왕과 수개미가 하늘을 난다
-  if (w.flight > 0) for (let k = 0; k < 14; k++) {
-    const x = (hash(k, 21) * WW + w.tick * (2 + k % 3) + k * 13) % WW, y = 8 + ((hash(k, 22) * (GY - 30) + w.tick * 3 * (k % 2 ? 1 : -1)) % (GY - 30) + GY) % (GY - 30)
-    P.rect(L_FX, x, y + 1, 4, 2, sp.body); P.rect(L_FX, x + 1, y - 2 + flip, 3, 2, 'rgba(235,240,255,.75)'); P.rect(L_FX, x + 4, y + 1, 1, 1, sp.body)
+  // 입구에서 차례로 날아올라 바람을 타고 하늘 밖으로 사라진다
+  if (w.flight > 0) {
+    const ex0 = w.grid.findIndex((g, i) => i >= SURF * W && i < (SURF + 1) * W && g === TUN) - SURF * W, t0 = w.flightTick ?? w.tick
+    for (let k = 0; k < 12; k++) {
+      const age = tt - t0 - k * 0.12, side = k % 2 ? 1 : -1
+      if (age < 0) { if (age > -0.6) { const gx = ex0 * S + side * (4 + (k % 4) * 3); P.rect(L_FX, gx, GY - 5, 4, 2, sp.body); P.rect(L_FX, gx + 1, GY - 7, 3, 2, 'rgba(235,240,255,.7)') } continue }   // 입구 풀잎에서 날 준비
+      const y = GY - 8 - age * 110, x = ex0 * S + side * age * 40 + Math.sin(age * 9 + k) * 6
+      if (y < -8 || x < -8 || x > WW + 8) continue   // 떠나 버렸다
+      const beat = (fr + k) % 2
+      P.rect(L_FX, x, y + 1, 4, 2, sp.body); P.rect(L_FX, x + 1, y - 2 + beat, 4, 2, 'rgba(235,240,255,.8)'); P.rect(L_FX, x + 4, y + 1, 1, 1, sp.body)
+    }
   }
   // 비와 눈
-  if (w.rain > 0 && s !== 3) for (let k = 0; k < 50; k++) P.rect(L_FX, (k * 37 + w.tick * 13) % WW, (k * 23 + w.tick * 29) % (GY - 4), 1, 5, 'rgba(215,232,245,.75)')
-  if (s === 3 && sp.climate === 'temperate') for (let k = 0; k < 40; k++) P.rect(L_FX, (k * 41 + w.tick * 3) % WW, (k * 19 + w.tick * 5) % (GY - 4), 2, 2, 'rgba(255,255,255,.85)')
+  if (w.rain > 0 && s !== 3) for (let k = 0; k < 50; k++) P.rect(L_FX, (k * 37 + fr * 3) % WW, (k * 23 + fr * 9) % (GY - 4), 1, 5, 'rgba(215,232,245,.75)')
+  if (s === 3 && sp.climate === 'temperate') for (let k = 0; k < 40; k++) P.rect(L_FX, (k * 41 + fr * 0.7 + Math.sin(fr * 0.2 + k) * 3) % WW, (k * 19 + fr * 1.5) % (GY - 4), 2, 2, 'rgba(255,255,255,.85)')
   if (nt > 0) P.rect(L_FX, 0, 0, WW, GY, `rgba(8,10,28,${(nt * 0.22).toFixed(2)})`)
   // 글자: 배경 상자를 깔고, 겹치면 생략
   const boxes: [number, number, number, number][] = []

@@ -32,7 +32,7 @@ export type LogLine = { s: number; d: number; ko: string; en: string }
 export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number; ship: number; other: number }
 
 export type World = {
-  v: 4; over?: boolean; weekSince?: string; need?: { dig: boolean; hunt: boolean }; noteDay?: Record<string, number>; snapDate?: string; snap?: Snap; weekKey?: string; week?: Tally; lastWeek?: { key: string; tally: Tally }; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
+  v: 4; over?: boolean; flightTick?: number; weekSince?: string; need?: { dig: boolean; hunt: boolean }; noteDay?: Record<string, number>; snapDate?: string; snap?: Snap; weekKey?: string; week?: Tally; lastWeek?: { key: string; tally: Tally }; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
   queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
@@ -307,11 +307,11 @@ function dayTick(w: World) {
   if (SP(w).tournaments && s < 2 && pop > 50 && rnd() < 0.05) tournament(w, pop)
   if (SP(w).succession === 'fission' && (s === 2 || s === 3) && w.day === 5 && pop >= SP(w).flightPop && queenYears(w) >= 1.5 && w.flownYear !== year) {
     for (const c of w.cohorts) c.n *= 0.5
-    w.alates = 1; w.flownYear = year; w.flight = 12
+    w.alates = 1; w.flownYear = year; startFlight(w, 12)
     say(w, '군락이 둘로 갈라졌다. 날개 없는 처녀 여왕이 일개미 절반을 데리고 떠났다. 날개 달린 수개미들만 날아올랐다.', 'The colony split in two. A wingless virgin queen left with half the workers; only the winged males took to the air.')
   } else if (SP(w).succession !== 'fission' && s === 1 && w.day === 5 && pop >= SP(w).flightPop && queenYears(w) >= 1.5 && w.flownYear !== year) {
     const n = Math.round(pop * 0.05)
-    w.alates += n; w.flownYear = year; w.flight = 24; w.carb = Math.max(0, w.carb - n * 0.5); w.prot = Math.max(0, w.prot - n * 0.3)
+    w.alates += n; w.flownYear = year; startFlight(w, 24); w.carb = Math.max(0, w.carb - n * 0.5); w.prot = Math.max(0, w.prot - n * 0.3)
     say(w, `결혼비행. 날개 달린 신여왕과 수개미 ${n}마리가 하늘로 날아올랐다. 이 군락의 다음 세대가 될 수 있다.`, `Nuptial flight. ${n} winged queens and males took to the sky. One of them may carry this colony on.`)
   }
   if (queenYears(w) >= SP(w).life * 0.85 && !w.over && w.day === 1) say(w, '여왕이 많이 늙었다. 알을 거의 낳지 못한다.', 'The queen has grown very old. She barely lays now.')
@@ -690,3 +690,6 @@ function needsHour(w: World) {
     if (w.noteDay.hunt !== today) { w.noteDay.hunt = today; say(w, '애벌레 먹일 단백질이 모자라 일개미들이 곤충 사냥에 나섰다.', 'Not enough protein for the larvae, so workers went out hunting insects.') }
   }
 }
+
+// 날개 달린 개미의 비행: 입구에서 하나씩 날아올라 하늘 밖으로 떠난다 (돌아오지 않는다)
+export function startFlight(w: World, hours: number) { w.flight = hours; w.flightTick = w.tick }

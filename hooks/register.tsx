@@ -3,7 +3,7 @@ import type { Register, RenderChildren } from 'claude-code'
 
 import {
   newWorld, hourTick, moveAnts, syncAnts, sendForager, sendDigger, spawnSpider, spawnCentipede, defeatCentipede, farmFor, sendTo,
-  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid, capacity, isWinter, prettyServer, feedBrood, nextHatchMinutes, rollDay, snapshot, emptyTally, nextGuestRoll,
+  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid, capacity, isWinter, prettyServer, feedBrood, nextHatchMinutes, rollDay, snapshot, emptyTally, nextGuestRoll, startFlight,
 } from './engine'
 import { emptyProfile, scanTranscript, scanHistory, scanSettings, pickSetup } from './profile'
 import { SPECIES, SPECIES_IDS } from './species'
@@ -17,7 +17,7 @@ import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
-const VERSION = '0.14.0'
+const VERSION = '0.14.1'
 const PANE = 'ant-nest'
 // 접속 75초 = 게임 1시간, 접속 30분 = 게임 하루, 약 35시간 = 게임 1년. 한 세대(여왕 수명 5~10년)는 매일 쓰면 현실 약 3개월
 const FRAME_MS = 500, FRAMES_PER_HOUR = 150
@@ -121,7 +121,7 @@ export const register: Register = (on, options) => {
       case 'build': bump('build'); w.digQueue = Math.min(40, w.digQueue + (Math.random() < bk ? 1 : 0)); sendDigger(w, ants); break
       case 'hunt': bump('hunt'); w.prot += gain(1.5 * bk); sendForager(w, ants, 2); if (!use.verify || Math.random() < 0.2) say(w, use.verify ? '만든 것을 확인했다. 사냥조가 곤충을 끌고 돌아온다.' : '테스트가 통과했다. 사냥조가 곤충을 끌고 돌아온다.', use.verify ? 'Checked the work. The hunting party drags an insect home.' : 'Tests passed. The hunting party drags an insect home.'); break
       case 'ship':
-        bump('ship'); w.carb += gain(1 * bk); w.prot += gain(1 * bk); feedBrood(w, 0.05); w.flight = Math.max(w.flight, 6)
+        bump('ship'); w.carb += gain(1 * bk); w.prot += gain(1 * bk); feedBrood(w, 0.05); if (w.flight <= 0) startFlight(w, 4)
         say(w, '작업을 세상에 내보냈다(커밋·배포). 날개 달린 개미들이 축하 비행을 한다.', 'Work shipped (commit or deploy). Winged ants take a celebration flight.')
         break
       case 'raise':
@@ -380,7 +380,7 @@ export const register: Register = (on, options) => {
     } else if (e.surface === 'desktop' || e.surface === 'mobile' || e.surface === 'vscode') {
       const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
       const pw = wide ? Math.round(Math.min(820, full * 0.52)) : Math.round(Math.max(260, Math.min(900, full - 8)))
-      picture = <Svg source={svg(w, ants, lang, pw)} alt={T.alt(pop)} width={pw} height={Math.round((pw * visibleRows(w)) / W)} />
+      picture = <Svg source={svg(w, ants, lang, pw, frame, (frame % FRAMES_PER_HOUR) / FRAMES_PER_HOUR)} alt={T.alt(pop)} width={pw} height={Math.round((pw * visibleRows(w)) / W)} />
     }
     // 위협 알림 띠
     const threats = w.threats.map(x => (x.k === 'centipede' ? (en ? `⚠ Centipede inside: make the failing ${x.tool} call succeed to drive it out` : `⚠ 지네 침입: 실패하던 ${x.tool}를 다시 성공시키면 물리칩니다`) : (en ? '⚠ Spider web on the trail: fix the error to cut it down' : '⚠ 길목에 거미줄: 오류를 고치면 걷어 냅니다')))
