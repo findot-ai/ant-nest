@@ -12,7 +12,7 @@
 /plugin install ant-nest --marketplace findot-ai/ant-nest
 ```
 
-**English** · [한국어](#한국어) · [Show your colony](https://github.com/findot-ai/ant-nest/issues/new?template=show-your-colony.yml)
+**English** · [한국어](#한국어) · [Changelog · 변경 이력](CHANGELOG.md) · [Show your colony](https://github.com/findot-ai/ant-nest/issues/new?template=show-your-colony.yml)
 
 A colony of Japanese carpenter ants (*Camponotus japonicus*) lives beside your Claude Code session. Time runs only while you are connected: 30 minutes connected is one game day and about 35 hours is a game year. One generation, the life of one queen, lasts roughly 3 months of everyday use. Seasons turn, brood grows with soil temperature, and the frost line creeps down in winter. Think of it as a Tamagotchi for your AI workflow, built on real ant ecology.
 
