@@ -34,7 +34,7 @@ export type Tally = { explore: number; build: number; hunt: number; raise: numbe
 export type World = {
   v: 4; over?: boolean; flightTick?: number; weekSince?: string; need?: { dig: boolean; hunt: boolean }; noteDay?: Record<string, number>; snapDate?: string; snap?: Snap; weekKey?: string; week?: Tally; lastWeek?: { key: string; tally: Tally }; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
-  queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
+  queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number; len?: number; type?: RoomType }[]; shaft?: { x: number; y: number }
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
   today: Tally; total: Tally; dayKey: string
   instinct: number; trail: number; learned: Record<string, string>
@@ -146,7 +146,7 @@ export function newWorld(setup: Setup = DEFAULT_SETUP, gen = 1, lineage: Lineage
     const id = makeChamber(w, ex + dir * (rx + 1), y, rx, ry, type)
     if (type === 'queen') { w.queen.room = id; w.queen.home = id }
   }
-  w.tips.push({ x: nx, y: SURF + depth, dx: 0, dy: 1 }, { x: nx - 4, y: SURF + 3, dx: -1, dy: 0 })
+  w.shaft = { x: nx, y: SURF + depth }
   const sp = SPECIES[setup.species]
   if (sp.bivouac) {
     w.brood.push({ st: 'larva', n: 30, dev: 0.3, prot: 3, room: w.queen.room })
@@ -196,25 +196,61 @@ export function say(w: World, ko: string, en: string) {
 }
 
 // ---------- 굴착 ----------
+// 굴 파기: 실제 개미굴을 석고로 본뜬 모양(Tschinkel)처럼, 입구에서 세로 갱도 하나가 아래로 내려가고
+// 방은 갱도에서 짧은 곁굴(2~4칸) 끝에 층층이 붙는다. 갱도 깊이는 군락 크기만큼만 내려간다.
+const entranceX = (w: World) => { for (let x = 0; x < W; x++) if (w.grid[idx(x, SURF)] === TUN) return x; return Math.floor(W / 2) }
+function shaftOf(w: World) {
+  if (w.shaft && w.grid[idx(w.shaft.x, w.shaft.y)] === TUN) return w.shaft
+  let x = entranceX(w), y = SURF
+  while (y + 1 < H && (w.grid[idx(x, y + 1)] === TUN || (x + 1 < W && w.grid[idx(x + 1, y + 1)] === TUN && ++x) || (x > 0 && w.grid[idx(x - 1, y + 1)] === TUN && x--))) y++
+  return (w.shaft = { x, y })
+}
+function nextRoomType(w: World): RoomType {
+  const c = { brood: 0, store: 0, waste: 0 } as Record<string, number>
+  for (const ch of w.chambers) c[ch.type] = (c[ch.type] ?? 0) + 1
+  return (c.store ?? 0) < 1 + Math.floor(w.carb / 120) ? 'store' : (c.waste ?? 0) < 1 + Math.floor(workers(w) / 200) ? 'waste' : 'brood'
+}
+const roomSize = (type: RoomType, y: number): [number, number] => (type === 'waste' ? [2, 1] : [3, y - SURF > 14 ? 2 : 1])   // 얕은 방은 납작, 깊은 방은 둥글게
 function digStep(w: World) {
   if (SP(w).bivouac) return false
-  if (!w.tips.length) { const c = w.chambers[Math.floor(rnd() * w.chambers.length)]!; w.tips.push({ x: c.cx + c.rx, y: c.cy, dx: 1, dy: 1 }) }
-  const ti = Math.floor(rnd() * w.tips.length), t = w.tips[ti]!
-  if (rnd() < 0.2) { const o = [[0, 1], [1, 0], [-1, 0], [1, 1], [-1, 1]][Math.floor(rnd() * 5)]!; t.dx = o[0]!; t.dy = o[1]! }
-  const nx = t.x + t.dx, ny = t.y + t.dy
-  if (ny < SURF + 3 || nx < 2 || nx > W - 3 || ny > H - 4 || w.grid[idx(nx, ny)] === ROCK) { t.dx = -t.dx || 1; t.dy = rnd() < 0.5 ? 1 : 0; return false }
-  t.x = nx; t.y = ny; carve(w, nx, ny)
-  if (rnd() < (w.need?.dig ? 0.2 : 0.09) && w.chambers.length < Math.min(24, 6 + Math.floor((workers(w) + majors(w)) / 25))) {
-    const c = { brood: 0, store: 0, waste: 0 } as Record<string, number>
-    for (const ch of w.chambers) c[ch.type] = (c[ch.type] ?? 0) + 1
-    const type: RoomType = (c.store ?? 0) < 1 + Math.floor(w.carb / 120) ? 'store' : (c.waste ?? 0) < 1 + Math.floor(workers(w) / 200) ? 'waste' : 'brood'
-    const rx = type === 'waste' ? 2 : 3, ry = type === 'waste' ? 1 : 2
-    const cx = t.x + (t.dx >= 0 ? rx + 1 : -rx - 1)
+  w.tips = w.tips.filter(t => t.len !== undefined)   // 예전 버전의 떠도는 굴 끝은 버린다
+  const t = w.tips[0]
+  // 1) 파던 곁굴을 끝까지 파고, 끝에 방을 만든다
+  if (t) {
+    const nx = t.x + t.dx
+    if (nx < 2 || nx > W - 3 || w.grid[idx(nx, t.y)] === ROCK) { w.tips.shift(); return false }
+    t.x = nx; carve(w, nx, t.y)
+    if (--t.len! > 0) return false
+    w.tips.shift()
+    const type = t.type ?? nextRoomType(w), [rx, ry] = roomSize(type, t.y), cx = t.x + t.dx * (rx + 1)
     if (!roomFree(w, cx, t.y, rx, ry)) return false
     makeChamber(w, cx, t.y, rx, ry, type)
     say(w, `지하 ${(t.y - SURF) * CM}cm에 ${ROOMNAME[type]}을 새로 팠다.`, `Dug a new ${ROOMNAME_EN[type].toLowerCase()} chamber ${(t.y - SURF) * CM}cm down.`)
-    if (w.tips.length < 4) w.tips.push({ x: t.x, y: t.y, dx: -t.dx || 1, dy: 1 })
     return true
+  }
+  const sh = shaftOf(w), pop = workers(w) + majors(w) + slaves(w)
+  const cap = Math.min(24, 6 + Math.floor(pop / 25)), maxY = Math.min(H - 5, SURF + 14 + Math.floor(pop / 6))
+  // 2) 방이 더 필요하면 갱도 옆에 곁굴 자리를 찾는다 (바위와 다른 방을 피해서)
+  if (w.chambers.length < cap) {
+    const type = nextRoomType(w)
+    for (let k = 0; k < 10; k++) {
+      const y = SURF + 3 + Math.floor(rnd() * Math.max(1, sh.y - SURF - 2)), dir = rnd() < 0.5 ? -1 : 1, len = 2 + Math.floor(rnd() * 3)
+      const [rx, ry] = roomSize(type, y), cx = sh.x + dir * (len + rx + 1)
+      if (!roomFree(w, cx, y, rx, ry)) continue
+      let clear = true
+      for (let i = 1; i <= len + 2 * rx + 1; i++) if (w.grid[idx(sh.x + dir * i, y)] === ROCK) { clear = false; break }
+      if (!clear) continue
+      w.tips.push({ x: sh.x, y, dx: dir, dy: 0, len, type })
+      return false
+    }
+  } else if (rnd() > 0.3) return false
+  // 3) 자리가 없으면 갱도를 한 칸 더 깊이. 바위가 막으면 옆으로 비켜 내려간다
+  if (sh.y >= maxY) return false
+  for (const dx of [0, rnd() < 0.5 ? -1 : 1, 0]) {
+    const x = sh.x + dx
+    if (x < 2 || x > W - 3) continue
+    if (dx === 0 && w.grid[idx(x, sh.y + 1)] !== ROCK) { carve(w, x, sh.y + 1); w.shaft = { x, y: sh.y + 1 }; return false }
+    if (dx !== 0 && w.grid[idx(x, sh.y)] !== ROCK && w.grid[idx(x, sh.y + 1)] !== ROCK) { carve(w, x, sh.y); carve(w, x, sh.y + 1); w.shaft = { x, y: sh.y + 1 }; return false }
   }
   return false
 }
@@ -354,7 +390,6 @@ export function hourTick(w: World) {
 }
 
 // ---------- 천적 ----------
-const entranceX = (w: World) => { for (let x = 0; x < W; x++) if (w.grid[idx(x, SURF)] === TUN) return x; return W / 2 }
 function randTunnel(w: World) {
   for (let k = 0; k < 300; k++) { const x = 2 + Math.floor(rnd() * (W - 4)), y = SURF + 6 + Math.floor(rnd() * (H - SURF - 10)); if (w.grid[idx(x, y)] === TUN && !chamberAt(w, x, y)) return { x, y } }
   return { x: entranceX(w), y: SURF + 4 }
@@ -473,14 +508,14 @@ export function moveAnts(w: World, ants: Ant[]) {
     if (cen && (a.kind === 'm' || Math.abs(a.x - cen.x) + Math.abs(a.y - cen.y) <= cen.alarmR)) { a.job = 'swarm'; step(w, a, cen.x, cen.y, 0.97); return }
     if (a.job === 'swarm') a.job = a.kind === 'm' ? 'guard' : 'idle'
     if (a.job === 'forage') { if (a.y <= SURF) { a.st = 'out'; a.y = SURF - 1 } else step(w, a, ex, SURF, 0.9); return }
-    if (a.job === 'dig') { const t = w.tips[(a.x + a.y) % Math.max(1, w.tips.length)]; if (t) step(w, a, t.x, t.y, 0.85); if (--a.t <= 0) { a.job = 'haul'; a.carry = 3 } return }
+    if (a.job === 'dig') { const t = w.tips[(a.x + a.y) % Math.max(1, w.tips.length)] ?? w.shaft; if (t) step(w, a, t.x, t.y, 0.85); if (--a.t <= 0) { a.job = 'haul'; a.carry = 3 } return }
     if (a.job === 'haul') { if (a.y <= SURF) { a.st = 'out'; a.y = SURF - 1; a.tx = Math.max(1, Math.min(W - 2, ex + (rnd() < 0.5 ? -1 : 1) * (2 + Math.floor(rnd() * 3)))) } else step(w, a, ex, SURF, 0.9); return }
     if (a.job === 'guard') { step(w, a, ex + Math.round((rnd() - 0.5) * 3), SURF + 3, 0.6); return }
     // 본능대로 일하기: 낮에는 알아서 채집을 나가고, 굴을 파서 흙을 밖으로 나른다
     if (a.kind === worker && canWork) {
       const r = rnd()
       if (r < (w.need?.hunt ? 0.012 : 0.006)) { const tree = w.trees[Math.floor(rnd() * w.trees.length)]!, prot = rnd() < (w.need?.hunt ? 0.7 : 0.2); a.job = 'forage'; a.carry = 0; a.t = prot ? 2 : 1; a.tx = prot ? 3 + Math.floor(rnd() * (W - 6)) : tree.x; a.climb = prot ? 0 : Math.max(0, tree.h - 2); a.up = 0; return }
-      if (r < 0.01 && w.tips.length) { a.job = 'dig'; a.t = 14 + Math.floor(rnd() * 10); return }
+      if (r < 0.01 && (w.tips.length || w.shaft)) { a.job = 'dig'; a.t = 14 + Math.floor(rnd() * 10); return }
     }
     // 그 밖에는 굴 곳곳을 돌아다닌다: 목적지에 닿거나 가끔 새 목적지를 고른다
     if (a.gx === undefined || (a.x === a.gx && a.y === a.gy) || rnd() < 0.015) {

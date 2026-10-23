@@ -3,6 +3,11 @@
 Every version of Ant Nest, newest first. Each entry is written in English, then Korean.
 개미굴의 모든 버전 기록입니다. 최신순이고, 각 항목은 영문 다음 국문입니다.
 
+## 0.14.4
+
+- Digging follows real nest casts: one vertical shaft goes down from the entrance, and each new chamber hangs off it at the end of a short side tunnel (2 to 4 cells). The shaft only goes as deep as the colony is large and steps around rocks. No more tunnels wandering in every direction. Shallow chambers are flat, deep ones rounder.
+- 굴 파기를 실제 개미굴 본뜨기 모양에 맞췄습니다: 입구에서 세로 갱도 하나가 내려가고, 새 방은 갱도에서 짧은 곁굴(2~4칸) 끝에 층층이 붙습니다. 갱도는 군락 크기만큼만 깊어지고 바위는 비켜 내려갑니다. 사방으로 길만 뻗던 문제가 없어졌고, 얕은 방은 납작하고 깊은 방은 둥글게 팝니다.
+
 ## 0.14.3
 
 - Majors stand out: bigger body, a head as large as the thorax, pale jaws and a dark outline, with a legend under the picture.
