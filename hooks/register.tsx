@@ -3,7 +3,7 @@ import type { Register } from 'claude-code'
 
 import {
   newWorld, hourTick, moveAnts, syncAnts, sendForager, sendDigger, spawnSpider, spawnCentipede, defeatCentipede, farmFor, sendTo,
-  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP,
+  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid,
 } from './engine'
 import { emptyProfile, scanTranscript, scanHistory, scanSettings, pickSetup } from './profile'
 import { SPECIES, SPECIES_IDS } from './species'
@@ -198,7 +198,8 @@ export const register: Register = (on, options) => {
         case 'hunt': bump('hunt'); w.prot += gain(1.5 * bk); sendForager(w, ants, 2); say(w, '테스트가 통과했다. 사냥조가 곤충을 끌고 돌아온다.', 'Tests passed. The hunting party drags an insect home.'); break
         case 'raise':
           bump('raise')
-          if (w.species === 'samurai') { w.brood.push({ st: 'pupa', n: 0.5 * bk, dev: 0.5, prot: 0, room: w.queen.room }); say(w, '일을 나눠 맡겼다. 사무라이개미 원정대가 곰개미 고치를 훔쳐 왔다.', 'Work was delegated. The samurai raiders brought back stolen wood ant cocoons.') }
+          // 사무라이개미: 위임은 곧 노예사냥. 습격대가 나가 있으면 전리품이 늘어난다
+          if (SP(w).dulotic) { if (!startRaid(w, bk) && w.raid) w.raid.booty += 0.4 * bk }
           else { w.brood.push({ st: 'egg', n: bk, dev: 0, prot: 0, room: w.queen.room }); say(w, '일을 나눠 맡겼다. 여왕이 알을 더 낳았다.', 'Work was delegated. The queen laid extra eggs.') }
           break
         case 'mcp': { bump('mcp'); const t = farmFor(w, use.server ?? 'mcp'); w.carb += gain(0.5 * bk); sendTo(w, ants, t.x, t.h, 1); break }
@@ -232,7 +233,9 @@ export const register: Register = (on, options) => {
     const pop = Math.round(workers(w) + majors(w)), h = hour(w)
     const clock = `${h < 12 ? T.am : T.pm} ${h % 12 === 0 ? 12 : h % 12}${T.hourSuffix}`
     const head = `ANT POP ${pop} · ${when()} · ${clock} · ${airT(w).toFixed(0)}°C`
-    const stats = `${T.workers} ${Math.round(workers(w))} · ${T.majors} ${Math.round(majors(w))} · ${T.egg} ${Math.round(bcount(w, 'egg'))} · ${T.larva} ${Math.round(bcount(w, 'larva'))} · ${T.pupa} ${Math.round(bcount(w, 'pupa'))} · ${T.carb} ${Math.round(w.carb)} · ${T.prot} ${Math.round(w.prot)}`
+    const caste = SP(w).dulotic ? (lang === 'en' ? `Samurai ${Math.round(raiders(w))} · Slaves (wood ants) ${Math.round(slaves(w))}` : `사무라이 ${Math.round(raiders(w))} · 노예(곰개미) ${Math.round(slaves(w))}`) : `${T.workers} ${Math.round(workers(w))}`
+    const phase = SP(w).bivouac ? (armyPhase(w) === 'statary' ? (lang === 'en' ? ' · Statary phase' : ' · 정착기') : (lang === 'en' ? ' · Nomadic phase' : ' · 유랑기')) : w.raid ? (lang === 'en' ? ' · ⚔ Raid out' : ' · ⚔ 노예사냥 중') : ''
+    const stats = `${caste} · ${T.majors} ${Math.round(majors(w))} · ${T.egg} ${Math.round(bcount(w, 'egg'))} · ${T.larva} ${Math.round(bcount(w, 'larva'))} · ${T.pupa} ${Math.round(bcount(w, 'pupa'))} · ${T.carb} ${Math.round(w.carb)} · ${T.prot} ${Math.round(w.prot)}${phase}`
     const t = w.today
     const usage = `${T.today} · ${T.explore} ${t.explore} · ${T.build} ${t.build} · ${T.hunt} ${t.hunt} · ${T.raise} ${t.raise} · ${T.bugs} ${t.bugs} (${T.fixed} ${t.fixed})`
     let picture

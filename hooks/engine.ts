@@ -17,9 +17,9 @@ export const ROOMNAME_EN: Record<RoomType, string> = { queen: 'Queen', brood: 'N
 export type Stage = 'egg' | 'larva' | 'pupa'
 export type RoomType = 'queen' | 'brood' | 'store' | 'waste'
 export type Chamber = { id: number; cx: number; cy: number; rx: number; ry: number; type: RoomType }
-export type Brood = { st: Stage; n: number; dev: number; prot: number; room: number }
-export type Cohort = { age: number; n: number; kind: 'w' | 'm' }
-export type Ant = { x: number; y: number; kind: 'w' | 'm'; job: 'idle' | 'forage' | 'dig' | 'guard' | 'swarm'; st: 'in' | 'out'; tx: number; carry: 0 | 1 | 2; t: number; climb: number; up: number; f?: number }
+export type Brood = { st: Stage; n: number; dev: number; prot: number; room: number; slave?: boolean }
+export type Cohort = { age: number; n: number; kind: 'w' | 'm' | 's' }   // s = 훔쳐 온 노예 일개미(사무라이개미)
+export type Ant = { x: number; y: number; kind: 'w' | 'm' | 's'; job: 'idle' | 'forage' | 'dig' | 'guard' | 'swarm'; st: 'in' | 'out'; tx: number; carry: 0 | 1 | 2; t: number; climb: number; up: number; f?: number }
 export type Threat = { k: 'spider' | 'centipede'; x: number; y: number; hp: number; hp0: number; life: number; tool?: string; trail: [number, number][]; alarmR: number; ate: number }
 export type Lineage = { gen: number; species: SpeciesId; years: number; peak: number; fixed: number; ended: 'succession' | 'collapse' }
 export type Origin = { stage: Stage0; ko: string; en: string }
@@ -29,7 +29,7 @@ export type LogLine = { s: number; d: number; ko: string; en: string }
 export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number }
 
 export type World = {
-  v: 4; over?: boolean; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
+  v: 4; over?: boolean; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
   queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
@@ -47,7 +47,11 @@ export const seasonName = (w: World, s: number, lang: Lang) => (SP(w).climate ==
 export const queenYears = (w: World) => w.queen.age / YEAR_DAYS
 export const hour = (w: World) => w.tick % 24
 export const isDay = (w: World) => { const h = hour(w); return h >= 6 && h < 19 }
-export const workers = (w: World) => w.cohorts.filter(c => c.kind === 'w').reduce((a, c) => a + c.n, 0)
+export const workers = (w: World) => w.cohorts.filter(c => c.kind !== 'm').reduce((a, c) => a + c.n, 0)
+export const slaves = (w: World) => w.cohorts.filter(c => c.kind === 's').reduce((a, c) => a + c.n, 0)
+export const raiders = (w: World) => w.cohorts.filter(c => c.kind === 'w').reduce((a, c) => a + c.n, 0)
+// 군대개미: 정착기 20일(산란) + 유랑기 14일
+export const armyPhase = (w: World) => (w.queen.age % 34 < 20 ? 'statary' : 'nomadic')
 export const majors = (w: World) => w.cohorts.filter(c => c.kind === 'm').reduce((a, c) => a + c.n, 0)
 export const bcount = (w: World, st: Stage) => w.brood.filter(b => b.st === st).reduce((a, b) => a + b.n, 0)
 export const epName = (ep: number, lang: Lang = 'ko', w?: World) => { const sn = w ? seasonName(w, (ep - 1) % 4, lang) : (lang === 'en' ? SEASONS_EN : SEASONS)[(ep - 1) % 4]; return lang === 'en' ? `Year ${Math.floor((ep - 1) / 4) + 1} ${sn}` : `${Math.floor((ep - 1) / 4) + 1}년차 ${sn}` }
@@ -98,7 +102,12 @@ export const DEFAULT_SETUP: Setup = { species: 'japonicus', stage: 'mature', far
 
 export function newWorld(setup: Setup = DEFAULT_SETUP, gen = 1, lineage: Lineage[] = []): World {
   const seed = Math.floor(rnd() * 90000) + 10000, st = setup.stage
-  const cohorts: Cohort[] = st === 'found' ? [{ age: 5, n: 6, kind: 'w' }]
+  const sp0 = SPECIES[setup.species]
+  const cohorts: Cohort[] = sp0.dulotic
+    ? (st === 'found' ? [{ age: 10, n: 20, kind: 's' }] : st === 'young' ? [{ age: 20, n: 14, kind: 'w' }, { age: 20, n: 30, kind: 's' }] : [{ age: 40, n: 36, kind: 'w' }, { age: 30, n: 80, kind: 's' }])
+    : sp0.bivouac
+      ? (st === 'mature' ? [{ age: 30, n: 200, kind: 'w' }, { age: 30, n: 16, kind: 'm' }] : [{ age: 20, n: 70, kind: 'w' }, { age: 20, n: 4, kind: 'm' }])
+      : st === 'found' ? [{ age: 5, n: 6, kind: 'w' }]
     : st === 'young' ? [{ age: 30, n: 22, kind: 'w' }, { age: 10, n: 16, kind: 'w' }]
       : [{ age: 60, n: 46, kind: 'w' }, { age: 25, n: 52, kind: 'w' }, { age: 8, n: 14, kind: 'w' }, { age: 40, n: 9, kind: 'm' }]
   const w: World = {
@@ -123,7 +132,7 @@ export function newWorld(setup: Setup = DEFAULT_SETUP, gen = 1, lineage: Lineage
   for (let y = H - 2; y < H; y++) for (let x = 0; x < W; x++) w.grid[idx(x, y)] = ROCK
   for (const x of [5 + Math.floor(rnd() * 6), W - 6 - Math.floor(rnd() * 6)]) w.trees.push({ x, h: 7 + Math.floor(rnd() * 3) })
   // 둥지: 세로 갱도 하나에 방이 층층이 (얕은 방은 길쭉, 깊은 방은 둥글게). 창업 군락은 얕은 첫 방 하나.
-  const L: [number, number, RoomType, number, number][] = st === 'found' ? [[7, 1, 'queen', 2, 1]]
+  const L: [number, number, RoomType, number, number][] = sp0.bivouac ? [[3, 1, 'queen', 5, 2]] : st === 'found' ? [[7, 1, 'queen', 2, 1]]
     : st === 'young' ? [[3, -1, 'store', 3, 1], [8, 1, 'brood', 3, 1], [12, -1, 'queen', 3, 2]]
       : [[3, -1, 'store', 4, 1], [6, 1, 'waste', 2, 1], [10, -1, 'brood', 3, 1], [14, 1, 'brood', 3, 2], [18, -1, 'queen', 3, 2], [23, 1, 'brood', 3, 2]]
   const depth = L[L.length - 1]![0] + 1
@@ -136,8 +145,18 @@ export function newWorld(setup: Setup = DEFAULT_SETUP, gen = 1, lineage: Lineage
   }
   w.tips.push({ x: nx, y: SURF + depth, dx: 0, dy: 1 }, { x: nx - 4, y: SURF + 3, dx: -1, dy: 0 })
   const sp = SPECIES[setup.species]
-  if (st === 'found') {
+  if (sp.bivouac) {
+    w.brood.push({ st: 'larva', n: 30, dev: 0.3, prot: 3, room: w.queen.room })
+    say(w, `${gen > 1 ? `${gen}대째. 갈라져 나온 ` : ''}${sp.ko} 군락. 굴을 파지 않고 일개미들이 몸을 엮어 살아 있는 둥지(비박)를 만들었다.`, `${gen > 1 ? `Generation ${gen}, split off from the old colony. ` : ''}An army ant colony. Instead of digging, the workers link their bodies into a living nest, a bivouac.`)
+  } else if (sp.dulotic && st === 'found') {
+    w.brood.push({ st: 'pupa', n: 10, dev: 0.3, prot: 0, room: w.queen.room, slave: true })
+    say(w, `${gen > 1 ? `${gen}대째. ` : ''}${sp.ko} 여왕이 곰개미 둥지에 숨어들어 그 여왕을 죽이고, 남은 곰개미 20마리를 자기 일꾼으로 삼았다.`, `${gen > 1 ? `Generation ${gen}. ` : ''}A samurai queen slipped into a wood ant nest, killed its queen, and took the 20 remaining wood ants as her workers.`)
+  } else if (sp.dulotic) {
+    w.brood.push({ st: 'pupa', n: 12, dev: 0.3, prot: 0, room: w.queen.room, slave: true })
+    say(w, `${sp.ko} 군락. 사무라이개미 ${st === 'young' ? 14 : 36}마리는 싸움만 하고, 훔쳐 온 곰개미 ${st === 'young' ? 30 : 80}마리가 노예로 모든 일을 한다.`, `A samurai ant colony: ${st === 'young' ? 14 : 36} samurai do nothing but fight, while ${st === 'young' ? 30 : 80} stolen wood ants do all the work as slaves.`)
+  } else if (st === 'found') {
     w.brood.push({ st: 'egg', n: 8, dev: 0.2, prot: 0, room: w.queen.room })
+    if (sp.id === 'atta') say(w, '여왕이 입속 주머니에 담아 온 버섯 균으로 첫 정원을 차렸다.', 'The queen started the first garden with the fungus pellet she carried in her mouth pouch.')
     say(w, `${gen > 1 ? `${gen}대째. ` : ''}결혼비행을 마친 ${sp.ko} 여왕이 첫 방을 팠다. 첫 일개미 6마리와 알 8개.`, `${gen > 1 ? `Generation ${gen}. ` : ''}A ${sp.en.toLowerCase()} queen, back from her mating flight, dug her first chamber. Six first workers and eight eggs.`)
   } else if (st === 'young') {
     w.brood.push({ st: 'larva', n: 12, dev: 0.3, prot: 12 * (0.1 + setup.majorBias), room: w.queen.room })
@@ -156,7 +175,7 @@ export function newWorld(setup: Setup = DEFAULT_SETUP, gen = 1, lineage: Lineage
 export function nextGeneration(w: World): World {
   const succ = w.alates > 0
   const lineage = [...w.lineage, { gen: w.gen, species: w.species, years: Math.round(queenYears(w) * 10) / 10, peak: Math.round(w.peak), fixed: w.total.fixed, ended: succ ? 'succession' : 'collapse' } as Lineage]
-  const nw = newWorld({ ...DEFAULT_SETUP, species: w.species, stage: 'found', farms: w.trees.filter(t => t.farm).map(t => t.farm!), instinct: w.instinct * 0.5 }, succ ? w.gen + 1 : 1, lineage)
+  const nw = newWorld({ ...DEFAULT_SETUP, species: w.species, stage: succ && SP(w).succession === 'fission' ? 'young' : 'found', farms: w.trees.filter(t => t.farm).map(t => t.farm!), instinct: w.instinct * 0.5 }, succ ? w.gen + 1 : 1, lineage)
   nw.total = { ...w.total }; nw.learned = w.learned
   return nw
 }
@@ -175,6 +194,7 @@ export function say(w: World, ko: string, en: string) {
 
 // ---------- 굴착 ----------
 function digStep(w: World) {
+  if (SP(w).bivouac) return false
   if (!w.tips.length) { const c = w.chambers[Math.floor(rnd() * w.chambers.length)]!; w.tips.push({ x: c.cx + c.rx, y: c.cy, dx: 1, dy: 1 }) }
   const ti = Math.floor(rnd() * w.tips.length), t = w.tips[ti]!
   if (rnd() < 0.2) { const o = [[0, 1], [1, 0], [-1, 0], [1, 1], [-1, 1]][Math.floor(rnd() * 5)]!; t.dx = o[0]!; t.dy = o[1]! }
@@ -214,6 +234,11 @@ function broodHour(w: World) {
   w.brood = w.brood.filter(b => b.n > 0.05)
 }
 function emerge(w: World, b: Brood) {
+  if (b.slave) {
+    w.cohorts.push({ age: 0, n: b.n, kind: 's' })
+    if (b.n > 1) say(w, `훔쳐 온 번데기에서 곰개미 ${Math.round(b.n)}마리가 깨어나 노예로 일을 시작했다.`, `${Math.round(b.n)} wood ants hatched from the stolen pupae and went to work as slaves.`)
+    return
+  }
   const sat = b.prot / Math.max(0.1, b.n) / 0.2
   const mf = workers(w) > 30 && sat > 0.5 ? clamp((0.03 + (sat - 0.6) * 0.12) * SP(w).majorK, 0, 0.3) : 0
   w.cohorts.push({ age: 0, n: b.n * (1 - mf), kind: 'w' })
@@ -233,7 +258,9 @@ function dayTick(w: World) {
   // 본능 채집(기본 수입). AI 활용 이벤트는 따로 들어온다.
   // 자동화는 본능이 된다: 내가 없어도 개미들이 스스로 하는 일
   const inst = 1 + w.instinct * 0.1
-  if (!isWinter(w) && w.rain <= 0) { w.carb += Wn * 0.028 * inst; w.prot += Wn * 0.004 * inst }
+  // 사무라이개미는 노예만 일한다. 군대개미 유랑기에는 매일 사냥한다
+  const labor = SP(w).dulotic ? slaves(w) : Wn, nomad = SP(w).bivouac && armyPhase(w) === 'nomadic' ? 1.5 : 1
+  if (!isWinter(w) && w.rain <= 0) { w.carb += labor * 0.028 * inst; w.prot += labor * 0.004 * inst * nomad }
   w.trail *= 0.9
   const Tn = tempAt(w, w.chambers[w.queen.room]!.cy), q10 = Math.pow(2, (Tn - 20) / 10)
   w.carb -= (Wn * 0.03 + Mn * 0.045) * q10
@@ -248,9 +275,10 @@ function dayTick(w: World) {
   const fT = Tn < 12 ? 0 : Tn < 22 ? (Tn - 12) / 10 : Tn < 30 ? 1 : 0
   const fP = clamp(w.prot / (5 + Wn * 0.05), 0, 1) * 0.7 + 0.3
   const fF = clamp(w.carb / (Wn * 0.6 + 10), 0.3, 1.6)
+  const armyK = SP(w).bivouac ? (armyPhase(w) === 'statary' ? (w.queen.age % 34 < 7 ? 3 : 0.2) : 0) : 1
   // 늙은 여왕은 수명의 70%를 넘기면서 산란이 줄어든다
   const qy = queenYears(w), life = SP(w).life, old = qy > life * 0.7 ? clamp(1 - (qy - life * 0.7) / (life * 0.3), 0.1, 1) : 1
-  const lay = s === 3 && isWinter(w) ? 0 : (3 + Math.min(30, Wn * 0.07)) * fT * fP * fF * old * SP(w).layK * (w.queen.health / 100)
+  const lay = s === 3 && isWinter(w) ? 0 : (3 + Math.min(30, Wn * 0.07)) * fT * fP * fF * old * armyK * SP(w).layK * (w.queen.health / 100)
   if (lay > 0.15) { w.prot = Math.max(0, w.prot - lay * 0.05); const br = w.chambers.find(c => c.type === 'brood'); w.brood.push({ st: 'egg', n: lay, dev: 0, prot: 0, room: br ? br.id : w.queen.room }) }
   for (const c of w.cohorts) {
     const L = c.kind === 'm' ? 180 : 140
@@ -270,13 +298,25 @@ function dayTick(w: World) {
   w.queen.age++
   const pop = workers(w) + majors(w); if (pop > w.peak) w.peak = pop
   const year = Math.floor((w.ep - 1) / 4)
-  if (s === 1 && w.day === 5 && pop >= SP(w).flightPop && queenYears(w) >= 1.5 && w.flownYear !== year) {
+  if (SP(w).bivouac && w.queen.age % 34 === 0) say(w, '정착기. 비박에 머물며 여왕이 한꺼번에 알을 낳는다.', 'Statary phase. The colony stays put and the queen lays in a burst.')
+  if (SP(w).bivouac && w.queen.age % 34 === 20) say(w, '유랑기. 밤마다 자리를 옮기며 낮에는 사냥 행렬을 낸다.', 'Nomadic phase. The colony moves every night and raids by day.')
+  if (SP(w).tournaments && s < 2 && pop > 50 && rnd() < 0.05) tournament(w, pop)
+  if (SP(w).succession === 'fission' && (s === 2 || s === 3) && w.day === 5 && pop >= SP(w).flightPop && queenYears(w) >= 1.5 && w.flownYear !== year) {
+    for (const c of w.cohorts) c.n *= 0.5
+    w.alates = 1; w.flownYear = year; w.flight = 12
+    say(w, '군락이 둘로 갈라졌다. 날개 없는 처녀 여왕이 일개미 절반을 데리고 떠났다. 날개 달린 수개미들만 날아올랐다.', 'The colony split in two. A wingless virgin queen left with half the workers; only the winged males took to the air.')
+  } else if (SP(w).succession !== 'fission' && s === 1 && w.day === 5 && pop >= SP(w).flightPop && queenYears(w) >= 1.5 && w.flownYear !== year) {
     const n = Math.round(pop * 0.05)
     w.alates += n; w.flownYear = year; w.flight = 24; w.carb = Math.max(0, w.carb - n * 0.5); w.prot = Math.max(0, w.prot - n * 0.3)
     say(w, `결혼비행. 날개 달린 신여왕과 수개미 ${n}마리가 하늘로 날아올랐다. 이 군락의 다음 세대가 될 수 있다.`, `Nuptial flight. ${n} winged queens and males took to the sky. One of them may carry this colony on.`)
   }
   if (queenYears(w) >= SP(w).life * 0.85 && !w.over && w.day === 1) say(w, '여왕이 많이 늙었다. 알을 거의 낳지 못한다.', 'The queen has grown very old. She barely lays now.')
-  if (queenYears(w) >= SP(w).life || (pop < 1 && w.brood.length === 0)) {
+  if (queenYears(w) >= SP(w).life && SP(w).succession === 'adopt' && w.alates > 0) {
+    // 곰개미: 결혼비행 뒤 받아들인 젊은 여왕이 있어 군락이 그대로 이어진다
+    w.lineage.push({ gen: w.gen, species: w.species, years: Math.round(queenYears(w) * 10) / 10, peak: Math.round(w.peak), fixed: w.total.fixed, ended: 'succession' })
+    w.gen++; w.queen.age = 0; w.queen.health = 100; w.alates = 0; w.peak = pop
+    say(w, `늙은 여왕이 죽었다. 결혼비행 뒤 받아들인 젊은 여왕이 군락을 그대로 잇는다. ${w.gen}대째.`, `The old queen has died. A young queen adopted after the nuptial flight carries the colony on. Generation ${w.gen}.`)
+  } else if (queenYears(w) >= SP(w).life || (pop < 1 && w.brood.length === 0)) {
     w.over = true
     say(w, w.alates > 0 ? '여왕이 죽었다. 결혼비행을 떠났던 신여왕 하나가 다음 세대를 연다.' : '여왕이 죽고 군락이 흩어졌다.', w.alates > 0 ? 'The queen has died. One of the queens from the nuptial flight begins the next generation.' : 'The queen has died and the colony scattered.')
   }
@@ -300,6 +340,7 @@ export function hourTick(w: World) {
   if (w.tick % 6 === 0) relocateBrood(w)
   if (w.rain > 0) w.rain--
   if (w.flight > 0) w.flight--
+  raidHour(w)
   if (w.digQueue > 0 && !isWinter(w)) { const n = Math.min(3, w.digQueue); for (let k = 0; k < n; k++) digStep(w); w.digQueue -= n }
   else if (!isWinter(w) && rnd() < 0.15) digStep(w)
   threatHour(w)
@@ -370,23 +411,24 @@ export function step(w: World, a: { x: number; y: number }, tx: number, ty: numb
 }
 
 export function syncAnts(w: World, ants: Ant[]) {
-  const tw = Math.min(70, Math.round(workers(w) / 4)), tm = Math.min(12, Math.round(majors(w) / 2))
-  const cnt = { w: ants.filter(a => a.kind === 'w').length, m: ants.filter(a => a.kind === 'm').length }
+  const tw = Math.min(70, Math.round(raiders(w) / 4)), tm = Math.min(12, Math.round(majors(w) / 2)), ts = Math.min(60, Math.round(slaves(w) / 4))
+  const cnt = { w: ants.filter(a => a.kind === 'w').length, m: ants.filter(a => a.kind === 'm').length, s: ants.filter(a => a.kind === 's').length }
   const q = w.chambers[w.queen.room]!
   while (cnt.w < tw) { ants.push({ x: q.cx, y: q.cy, kind: 'w', job: 'idle', st: 'in', tx: 0, carry: 0, t: 0, climb: 0, up: 0 }); cnt.w++ }
+  while (cnt.s < ts) { ants.push({ x: q.cx, y: q.cy, kind: 's', job: 'idle', st: 'in', tx: 0, carry: 0, t: 0, climb: 0, up: 0 }); cnt.s++ }
   while (cnt.m < tm) { ants.push({ x: q.cx, y: q.cy, kind: 'm', job: 'guard', st: 'in', tx: 0, carry: 0, t: 0, climb: 0, up: 0 }); cnt.m++ }
-  for (const k of ['w', 'm'] as const) { const target = k === 'w' ? tw : tm; while ((k === 'w' ? cnt.w : cnt.m) > target) { const j = ants.findIndex(a => a.kind === k && a.st === 'in'); if (j < 0) break; ants.splice(j, 1); if (k === 'w') cnt.w--; else cnt.m-- } }
+  for (const k of ['w', 'm', 's'] as const) { const target = { w: tw, m: tm, s: ts }[k]; while (cnt[k] > target) { const j = ants.findIndex(a => a.kind === k && a.st === 'in'); if (j < 0) break; ants.splice(j, 1); cnt[k]-- } }
 }
 
 export function sendForager(w: World, ants: Ant[], carry: 1 | 2) {
   if (isWinter(w)) return
-  const a = ants.find(x => x.kind === 'w' && x.st === 'in' && x.job === 'idle')
+  const a = ants.find(x => x.kind === (SP(w).dulotic ? 's' : 'w') && x.st === 'in' && x.job === 'idle')
   if (!a) return
   const tree = w.trees[Math.floor(rnd() * w.trees.length)]!
   a.job = 'forage'; a.carry = 0; a.t = carry; a.tx = carry === 1 ? tree.x : 3 + Math.floor(rnd() * (W - 6)); a.climb = carry === 1 ? tree.h - 2 : 0; a.up = 0
 }
 export function sendDigger(w: World, ants: Ant[]) {
-  const a = ants.find(x => x.kind === 'w' && x.st === 'in' && x.job === 'idle'); if (a) { a.job = 'dig'; a.t = 20 }
+  const a = ants.find(x => x.kind === (SP(w).dulotic ? 's' : 'w') && x.st === 'in' && x.job === 'idle'); if (a) { a.job = 'dig'; a.t = 20 }
 }
 
 export function moveAnts(w: World, ants: Ant[]) {
@@ -437,6 +479,46 @@ export function farmFor(w: World, server: string) {
 }
 export function sendTo(w: World, ants: Ant[], x: number, h: number, carry: 1 | 2) {
   if (isWinter(w)) return
-  const a = ants.find(o => o.kind === 'w' && o.st === 'in' && o.job === 'idle'); if (!a) return
+  const a = ants.find(o => o.kind === (SP(w).dulotic ? 's' : 'w') && o.st === 'in' && o.job === 'idle'); if (!a) return
   a.job = 'forage'; a.carry = 0; a.t = carry; a.tx = x; a.climb = Math.max(0, h - 2); a.up = 0
+}
+
+// ---------- 사무라이개미 노예사냥: 정찰병이 곰개미 둥지를 찾으면 떼 지어 번데기를 훔쳐 온다 ----------
+export function startRaid(w: World, mult: number) {
+  // 하루에 한 번까지: 같은 곰개미 둥지는 털린 뒤 2~3주 동안 지상 활동을 멈춘다
+  const today = Math.floor(w.tick / 24)
+  if (!SP(w).dulotic || w.raid || isWinter(w) || w.raidDay === today) return false
+  const r = raiders(w); if (r < 5) return false
+  w.raidDay = today
+  w.raid = { t: 6, booty: Math.min(12, r * 0.05 * mult) }
+  say(w, `정찰병이 곰개미 둥지를 찾아냈다. 사무라이개미 ${Math.round(r)}마리가 떼 지어 출격한다.`, `A scout found a wood ant nest. ${Math.round(r)} samurai march out in a column.`)
+  return true
+}
+function raidHour(w: World) {
+  const s = season(w)
+  // 본능 습격: 여름 무렵 오후 4시쯤, 이틀에 한 번꼴
+  if (SP(w).dulotic && !w.raid && hour(w) === 16 && (s === 1 || (s === 0 && w.day > 14) || (s === 2 && w.day < 8)) && rnd() < 0.5) startRaid(w, 1)
+  if (!w.raid) return
+  if (--w.raid.t > 0) return
+  const n = Math.max(0.5, w.raid.booty), lost = raiders(w) * 0.02
+  w.brood.push({ st: 'pupa', n, dev: 0.3, prot: 0, room: w.queen.room, slave: true })
+  for (const c of w.cohorts) if (c.kind === 'w') { c.n = Math.max(0, c.n - lost); break }
+  say(w, `습격대가 곰개미 번데기 ${Math.round(n)}개를 물고 돌아왔다.`, `The raiders came home carrying ${Math.round(n)} wood ant pupae.`)
+  w.raid = null
+}
+
+// ---------- 꿀단지개미 토너먼트: 과시 싸움 끝에 한쪽이 훨씬 약하면 습격당한다 ----------
+function tournament(w: World, pop: number) {
+  const rival = pop * (0.4 + rnd() * 1.3)
+  if (pop > rival * 1.6) {
+    const n = rival * 0.08
+    w.brood.push({ st: 'pupa', n, dev: 0.4, prot: 0, room: w.queen.room }); w.carb += rival * 0.1
+    say(w, `이웃 군락과 토너먼트를 벌였다. 우리가 훨씬 커서 그 군락을 습격해 새끼 ${Math.round(n)}마리와 꿀단지를 데려왔다.`, `A tournament with a neighbor colony. We were far larger, so we raided it and carried off ${Math.round(n)} brood and its repletes.`)
+  } else if (rival > pop * 1.6) {
+    w.carb *= 0.55; for (const b of w.brood) b.n *= 0.5
+    if (rnd() < 0.12) {
+      w.over = true
+      say(w, '토너먼트에서 밀렸다. 이웃 군락이 쳐들어와 여왕을 죽이고 새끼와 꿀단지를 빼앗아 갔다.', 'We lost the tournament. The neighbors raided us, killed the queen, and took the brood and repletes.')
+    } else say(w, '토너먼트에서 밀렸다. 이웃 군락이 쳐들어와 새끼 절반과 꿀단지를 빼앗아 갔다. 여왕은 살아남았다.', 'We lost the tournament. The neighbors raided us and took half the brood and our repletes. The queen survived.')
+  } else say(w, '이웃 군락과 다리를 세우고 몸을 부풀리는 과시 싸움(토너먼트)을 벌였다. 승부가 나지 않아 서로 물러났다.', 'A display tournament with a neighbor colony: stilt-walking and puffing up. Neither side gave way.')
 }

@@ -56,16 +56,16 @@ Only the 15 most recent conversation files under 4 MB are read.
 
 ## Species
 
-<p align="center"><img src="docs/species.png" width="720" alt="Four species side by side: leafcutter fungus gardens, honeypot ants hanging in the honey room, a wood ant nuptial flight, samurai ants"></p>
+<p align="center"><img src="docs/species.png" width="720" alt="Four species side by side: leafcutter fungus gardens, honeypot ants hanging in the honey room, an army ant bivouac, a samurai slave raid"></p>
 
 | Species | Real ecology | Strong at |
 |---|---|---|
 | Japanese carpenter ant *Camponotus japonicus* | Deep chambers, big-headed majors | Balanced |
-| Japanese wood ant *Formica japonica* | Common and fast-growing | Exploring, editing; a gentle start |
-| Leafcutter ant *Atta cephalotes* | Farms fungus on cut leaves; tropical, no winter | MCP tools (the leaf supply) |
-| Honeypot ant *Myrmecocystus mexicanus* | Living honey jars hang from the ceiling; desert | Automation and reserves |
-| Army ant *Eciton burchellii* | Raids in swarms; tropical | Parallel agents and tests |
-| Samurai ant *Polyergus samurai* | Steals wood ant cocoons to raise as workers | Delegation |
+| Japanese wood ant *Formica japonica* | Common and fast-growing; adopts young queens after the nuptial flight, so the colony carries on when a queen dies | Exploring, editing; a gentle start |
+| Leafcutter ant *Atta cephalotes* | The queen carries a fungus pellet in her mouth pouch; workers cut leaves to feed the garden. Tropical, no winter | MCP tools (the leaf supply) |
+| Honeypot ant *Myrmecocystus mexicanus* | Repletes hang from the ceiling as living honey jars. Colonies hold display tournaments; a much weaker colony gets raided for brood and repletes. Desert | Automation and reserves |
+| Army ant *Eciton burchellii* | No dug nest: a living bivouac of linked bodies. Lays only in the ~20-day statary phase, raids daily in the ~14-day nomadic phase. Wingless queens, so colonies split instead of flying | Parallel agents and tests |
+| Samurai ant *Polyergus samurai* | Slave-maker: samurai never forage or nurse. Scouts find wood ant nests, the column raids them for pupae, and the wood ants that hatch do all the work as slaves. No raids, no slaves, and the colony starves | Delegation (each delegation sends a raid) |
 
 `/ant species` lists them; `/ant new <species>` starts a new colony with one (for example `/ant new atta`).
 
@@ -157,16 +157,16 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 ## 개미종
 
-<p align="center"><img src="docs/species.png" width="720" alt="네 종을 나란히: 잎꾼개미의 버섯 정원, 천장에 매달린 꿀단지개미, 곰개미의 결혼비행, 사무라이개미"></p>
+<p align="center"><img src="docs/species.png" width="720" alt="네 종을 나란히: 잎꾼개미의 버섯 정원, 천장에 매달린 꿀단지개미, 군대개미의 비박, 사무라이개미의 노예사냥"></p>
 
 | 종 | 실제 생태 | 강한 활용 |
 |---|---|---|
 | 일본왕개미 *Camponotus japonicus* | 깊은 층층 방, 머리 큰 병정 | 균형형 |
-| 곰개미 *Formica japonica* | 흔하고 빨리 자람 | 탐색, 편집. 입문용 |
-| 잎꾼개미 *Atta cephalotes* | 잎을 잘라 버섯 농사. 열대라 겨울이 없음 | MCP 외부 도구(잎 공급원) |
-| 꿀단지개미 *Myrmecocystus mexicanus* | 꿀을 채운 일개미가 천장에 매달린 살아 있는 창고. 사막 | 자동화, 비축 |
-| 군대개미 *Eciton burchellii* | 떼로 이동하며 약탈. 열대 | 병렬 에이전트, 테스트 |
-| 사무라이개미 *Polyergus samurai* | 곰개미 고치를 훔쳐 일꾼으로 키움 | 위임 |
+| 곰개미 *Formica japonica* | 흔하고 빨리 자람. 결혼비행 뒤 젊은 여왕을 받아들여, 여왕이 죽어도 군락이 이어짐 | 탐색, 편집. 입문용 |
+| 잎꾼개미 *Atta cephalotes* | 여왕이 입속 주머니에 버섯 균을 담아 와 정원을 차리고, 일개미가 잘라 온 잎으로 키움. 열대라 겨울이 없음 | MCP 외부 도구(잎 공급원) |
+| 꿀단지개미 *Myrmecocystus mexicanus* | 꿀을 채운 일개미가 천장에 매달린 살아 있는 창고. 이웃과 과시 싸움(토너먼트)을 벌이고, 훨씬 약한 쪽은 습격당해 새끼와 꿀단지를 빼앗김. 사막 | 자동화, 비축 |
+| 군대개미 *Eciton burchellii* | 굴 대신 몸을 엮은 살아 있는 둥지(비박). 정착기(약 20일)에만 산란, 유랑기(약 14일)에는 매일 사냥. 여왕은 날개가 없어 결혼비행 대신 군락이 둘로 갈라짐 | 병렬 에이전트, 테스트 |
+| 사무라이개미 *Polyergus samurai* | 노예사냥개미. 스스로 채집도 육아도 안 함. 정찰병이 곰개미 둥지를 찾으면 떼 지어 번데기를 훔쳐 오고, 깨어난 곰개미가 노예로 모든 일을 함. 습격이 멈추면 굶음 | 위임 (위임할 때마다 노예사냥 출격) |
 
 `/ant species`로 목록을 보고, `/ant new <종>`으로 그 종의 새 군락을 시작합니다(예: `/ant new atta`).
 

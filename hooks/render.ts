@@ -185,12 +185,13 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
   const flip = w.tick % 2
   for (const [i, a] of ants.entries()) {
     const f = a.f ?? 1, out = a.st === 'out', climbing = out && a.up > 0
-    const body = a.job === 'swarm' ? '#2b0e07' : a.kind === 'm' ? sp.major : sp.body
+    const body = a.job === 'swarm' ? '#2b0e07' : a.kind === 'm' ? sp.major : a.kind === 's' ? '#3b3638' : sp.body
+    const leaf = sp.carry ?? '#e8a838'
     if (climbing) {
       const x = a.x * S + (i % 2 ? 4 : -2), y = GY - 6 - a.up * S
       P.rect(L_ANT, x + 1, y, 2, 2, body); P.rect(L_ANT, x + 1, y + 2, 2, 1, body); P.rect(L_ANT, x, y + 3, 4, 3, body)
       P.rect(L_ANT, x - 1, y + 1 + flip, 1, 1, body); P.rect(L_ANT, x + 4, y + 2 - flip, 1, 1, body)
-      if (a.carry) P.rect(L_FX, x + 1, y - 2, 2, 2, a.carry === 2 ? '#c9472f' : '#e8a838')
+      if (a.carry) P.rect(L_FX, x + 1, y - 2, 2, 2, a.carry === 2 ? '#c9472f' : leaf)
       continue
     }
     const y = out ? GY - 6 : a.y * S + 1, x = a.x * S
@@ -201,7 +202,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
     P.rect(L_ANT, f > 0 ? hd + (big ? 3 : 2) : hd - 1, y - 1, 1, 1, body)
     for (let k = 0; k < 3; k++) P.rect(L_ANT, x + 1 + k * 2 + ((k + flip) % 2), y + 4, 1, 1, body)
     if (a.job === 'swarm') P.rect(L_FX, hd, y - 2, 2, 1, '#ff5a3c')
-    if (a.carry) P.rect(L_FX, f > 0 ? hd + 1 : hd - 2, y - 2, 3, 2, a.carry === 2 ? '#c9472f' : '#e8a838')
+    if (a.carry) P.rect(L_FX, f > 0 ? hd + 1 : hd - 2, y - 2, sp.carry ? 4 : 3, sp.carry ? 3 : 2, a.carry === 2 ? '#c9472f' : leaf)
   }
   // 여왕: 크고 날개 자국이 있다
   const q = w.chambers[w.queen.room]!, qx = q.cx * S - 6, qy = (q.cy + q.ry) * S - 3
@@ -229,6 +230,18 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
       P.rect(L_TXT, t.x * S - 4, t.y * S - 7, 14, 3, '#2a1a12'); P.rect(L_TXT, t.x * S - 4, t.y * S - 7, Math.max(1, Math.round((14 * t.hp) / t.hp0)), 3, '#de6a4c')
     }
   }
+  // 군대개미 비박: 일개미 몸이 엉겨 붙은 살아 있는 둥지
+  if (sp.bivouac) { const c = w.chambers[w.queen.room]!; for (let k = 0; k < 90; k++) { const ax = (c.cx - c.rx) * S + hash(k, 31) * (c.rx * 2 + 1) * S, ay = (c.cy - c.ry) * S + hash(k, 32) * (c.ry * 2 + 1) * S; P.rect(L_ITEM, ax, ay, 3, 2, k % 5 ? sp.body : sp.major) } }
+  // 사무라이개미 노예사냥 행렬: 나갈 때는 빈 턱, 돌아올 때는 곰개미 번데기를 물고
+  if (w.raid) {
+    const ex = w.grid.findIndex((g, i) => i >= SURF * W && i < (SURF + 1) * W && g === TUN) - SURF * W, back = w.raid.t <= 3
+    for (let k = 0; k < 14; k++) {
+      const prog = ((w.tick * 7 + k * 9) % 60) / 60, x = back ? WW - prog * (WW - ex * S) : ex * S + prog * (WW - ex * S), y = GY - 6
+      P.rect(L_FX, x, y + 1, 3, 3, sp.body); P.rect(L_FX, x + (back ? -2 : 3), y + 1, 2, 2, sp.body); P.rect(L_FX, x + (back ? -3 : 5), y, 3, 3, sp.major)
+      if (back) P.rect(L_FX, x - 5, y - 1, 3, 4, '#efe2c8')
+    }
+    P.rect(L_TERR, WW - 14, GY - 7, 14, 7, '#8a6a46'); P.rect(L_TERR, WW - 10, GY - 9, 8, 2, '#8a6a46')
+  }
   // 결혼비행: 날개 달린 신여왕과 수개미가 하늘을 난다
   if (w.flight > 0) for (let k = 0; k < 14; k++) {
     const x = (hash(k, 21) * WW + w.tick * (2 + k % 3) + k * 13) % WW, y = 8 + ((hash(k, 22) * (GY - 30) + w.tick * 3 * (k % 2 ? 1 : -1)) % (GY - 30) + GY) % (GY - 30)
@@ -246,7 +259,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko') {
     boxes.push([x, y - 8, wdt, 10])
     P.raw(L_TXT, `<rect x="${x.toFixed(1)}" y="${y - 8}" width="${wdt.toFixed(1)}" height="10" rx="2" fill="${bg}"/><text x="${(x + wdt / 2).toFixed(1)}" y="${y}" font-size="7.5" text-anchor="middle" fill="${fg}">${text.replace(/[<>&"]/g, '')}</text>`)
   }
-  label(lang === 'en' ? 'Queen' : '여왕', q.cx * S + 3, (q.cy - q.ry) * S - 2, '#1a120a', '#e3a33b')
+  label(sp.bivouac ? (lang === 'en' ? 'Bivouac (living nest)' : '비박 (살아 있는 둥지)') : lang === 'en' ? 'Queen' : '여왕', q.cx * S + 3, (q.cy - q.ry) * S - 2, '#1a120a', '#e3a33b')
   for (const c of w.chambers) if (c.type !== 'queen') label(RN[c.type], c.cx * S + 3, (c.cy - c.ry) * S - 2, '#efe4d2', 'rgba(20,14,10,.72)')
   for (const t of w.trees) if (t.farm) label(t.farm.slice(0, 14), t.x * S, GY + 10, '#eaf5df', 'rgba(30,60,30,.8)')
   if (fd > 0) label(`${lang === 'en' ? 'Frost line' : '동결선'} ${fd}cm`, WW - 40, GY + (fd / CM) * S - 2, '#0b1a2a', 'rgba(220,240,255,.9)')
