@@ -1,0 +1,5 @@
+{
+  "name": "ant-nest",
+  "owner": { "name": "findot-ai" },
+  "plugins": [{ "name": "ant-nest", "source": "./" }]
+}
