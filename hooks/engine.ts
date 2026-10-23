@@ -27,11 +27,12 @@ export type Lineage = { gen: number; species: SpeciesId; years: number; peak: nu
 export type Origin = { stage: Stage0; ko: string; en: string }
 export type Stage0 = 'found' | 'young' | 'mature'
 export type Setup = { species: SpeciesId; stage: Stage0; farms: string[]; trail: number; instinct: number; majorBias: number; storeBias: number; ko: string; en: string }
+export type Snap = { pop: number; workers: number; majors: number; raiders: number; slaves: number; brood: number; rooms: number; depth: number; carb: number; prot: number; level: number; dex: number }
 export type LogLine = { s: number; d: number; ko: string; en: string }
-export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number }
+export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number; ship: number }
 
 export type World = {
-  v: 4; over?: boolean; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
+  v: 4; over?: boolean; snapDate?: string; snap?: Snap; weekKey?: string; week?: Tally; lastWeek?: { key: string; tally: Tally }; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
   queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
@@ -62,7 +63,7 @@ export const idx = (x: number, y: number) => y * W + x
 export const inb = (x: number, y: number) => x >= 0 && x < W && y >= 0 && y < H
 export const layerOf = (y: number) => { const d = y - SURF; return d < 6 ? 0 : d < 22 ? 1 : d < 38 ? 2 : 3 }
 const rnd = Math.random
-export const emptyTally = (): Tally => ({ explore: 0, build: 0, hunt: 0, raise: 0, bugs: 0, fixed: 0, mcp: 0, skill: 0, auto: 0, plan: 0, parallel: 0 })
+export const emptyTally = (): Tally => ({ explore: 0, build: 0, hunt: 0, raise: 0, bugs: 0, fixed: 0, mcp: 0, skill: 0, auto: 0, plan: 0, parallel: 0, ship: 0 })
 
 // ---------- 온도: T(z,t) = 12 + (계절평균−12)e^(−z/80) + 일교차·e^(−z/12)·sin(ωt − z/12) ----------
 export function airMean(w: World) {
@@ -491,13 +492,21 @@ export function moveAnts(w: World, ants: Ant[]) {
 
 // ---------- 외부 목초지(MCP 서버 하나 = 진딧물 나무 하나) ----------
 // MCP 서버 이름을 목초지 이름으로: 내부 ID처럼 생긴 이름은 짧게 줄인다
-export function prettyServer(name: string) {
-  const n = name.replace(/^(mcp|server|plugin)[-_]/i, '')
-  if (/^[0-9a-f]{8}(-[0-9a-f]{2,})*/i.test(n) || /^[0-9a-f-]{16,}$/i.test(n)) return `MCP·${n.slice(0, 4)}`
-  return n.length > 14 ? n.slice(0, 13) + '…' : n
+const KNOWN: [RegExp, string][] = [[/drive/i, 'Google Drive'], [/gmail/i, 'Gmail'], [/calendar/i, 'Google Calendar'], [/sheets?/i, 'Google Sheets'], [/docs?\b|google_docs/i, 'Google Docs'],
+  [/slack/i, 'Slack'], [/notion/i, 'Notion'], [/github/i, 'GitHub'], [/gitlab/i, 'GitLab'], [/figma/i, 'Figma'], [/linear/i, 'Linear'], [/atlassian|jira|confluence/i, 'Atlassian'],
+  [/canva/i, 'Canva'], [/hubspot/i, 'HubSpot'], [/asana/i, 'Asana'], [/firebase/i, 'Firebase'], [/supabase/i, 'Supabase'], [/stripe/i, 'Stripe'], [/sentry/i, 'Sentry'], [/vercel/i, 'Vercel'], [/registry/i, 'MCP Registry']]
+// MCP 서버 이름을 사람이 읽는 이름으로: 내부 ID처럼 생긴 이름은 그 서버 도구 이름에서 서비스를 짐작한다
+export function prettyServer(name: string, tool = '') {
+  const n = name.replace(/^(mcp|server|plugin|claude_ai)[-_]/i, '')
+  const isId = /^[0-9a-f]{8}(-[0-9a-f]{2,})*/i.test(n) || /^[0-9a-f-]{16,}$/i.test(n)
+  for (const [re, label] of KNOWN) if (re.test(isId ? tool : n) || re.test(n)) return label
+  if (isId) return lang0(tool) || '외부 도구'
+  const t = n.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  return t.length > 16 ? t.slice(0, 15) + '…' : t
 }
-export function farmFor(w: World, rawServer: string) {
-  const server = prettyServer(rawServer)
+const lang0 = (tool: string) => { const m = /^([a-z]+)_/i.exec(tool); return m && m[1]!.length > 3 ? m[1]![0]!.toUpperCase() + m[1]!.slice(1) : '' }
+export function farmFor(w: World, rawServer: string, tool = '') {
+  const server = prettyServer(rawServer, tool)
   const t = w.trees.find(x => x.farm === server)
   if (t) return t
   if (w.trees.length >= 7) return w.trees[Math.floor(rnd() * w.trees.length)]!
@@ -557,7 +566,7 @@ function tournament(w: World, pop: number) {
   } else say(w, '이웃 군락과 다리를 세우고 몸을 부풀리는 과시 싸움(토너먼트)을 벌였다. 승부가 나지 않아 서로 물러났다.', 'A display tournament with a neighbor colony: stilt-walking and puffing up. Neither side gave way.')
 }
 
-// ---------- 개미집 손님: 종마다 함께 사는 생물이 희귀도에 따라 찾아온다. 도감은 세대를 넘어 이어진다 ----------
+// ---------- 개미집 생물: 종마다 함께 사는 생물이 희귀도에 따라 찾아온다. 도감은 세대를 넘어 이어진다 ----------
 const GUEST_P = [0, 0.07, 0.025, 0.01, 0.003]
 function guestDay(w: World) {
   const pop = workers(w) + majors(w), calls = Object.values(w.today).reduce((a, b) => a + b, 0)
@@ -579,7 +588,7 @@ function guestDay(w: World) {
     w.guests.push({ id: def.id, x, y, days: 4 + Math.floor(rnd() * 6) })
     const d = w.dex[def.id]
     if (!d) { w.dex[def.id] = { n: 1, first: epName(w.ep, 'ko', w) }; w.newDex.push(def.id) } else d.n++
-    say(w, `손님이 찾아왔다: ${def.ko} (${RARITY_KO[def.rarity]}). ${def.koDesc}`, `A guest arrived: ${def.en} (${RARITY_EN[def.rarity]}). ${def.enDesc}`)
+    say(w, `개미집에 새 생물이 찾아왔다: ${def.ko} (${RARITY_KO[def.rarity]}). ${def.koDesc}`, `A creature moved into the nest: ${def.en} (${RARITY_EN[def.rarity]}). ${def.enDesc}`)
     break
   }
 }
@@ -608,4 +617,22 @@ export function nextHatchMinutes(w: World) {
     if (perHour > 0) best = Math.min(best, ((1 - b.dev) / perHour) * 1.25)
   }
   return best
+}
+
+// ---------- 날짜가 바뀌면: 그 시점 숫자를 기록해 두고(어제 대비 변화 표시용), 오늘의 AI 활용을 새로 센다 ----------
+export function snapshot(w: World): Snap {
+  return {
+    pop: Math.round(workers(w) + majors(w)), workers: Math.round(workers(w)), majors: Math.round(majors(w)), raiders: Math.round(raiders(w)), slaves: Math.round(slaves(w)),
+    brood: Math.round(bcount(w, 'egg') + bcount(w, 'larva') + bcount(w, 'pupa')), rooms: w.chambers.length, depth: (w.deepest - SURF) * CM,
+    carb: Math.round(w.carb), prot: Math.round(w.prot), level: colonyLevel(w), dex: Object.keys(w.dex ?? {}).length,
+  }
+}
+export function rollDay(w: World, date: string, week: string) {
+  let weekRolled = false
+  if (w.weekKey !== week) {
+    if (w.weekKey && w.week) { w.lastWeek = { key: w.weekKey, tally: w.week }; weekRolled = true }
+    w.week = emptyTally(); w.weekKey = week
+  }
+  if (w.snapDate !== date) { w.snap = snapshot(w); w.snapDate = date; w.today = emptyTally() }
+  return weekRolled
 }

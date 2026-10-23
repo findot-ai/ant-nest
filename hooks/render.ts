@@ -198,20 +198,11 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
       continue
     }
     const y = out ? GY - 6 : a.y * S + 1, x = a.x * S
-    const g = f > 0 ? x : x + 3, th = f > 0 ? x + 3 : x + 1, hd = f > 0 ? x + 5 : x - 1
-    const big = a.kind === 'm'
-    P.rect(L_ANT, g, y + 1, 3, 3, body); P.rect(L_ANT, th, y + 1, 2, 2, body)
-    P.rect(L_ANT, big ? (f > 0 ? hd : hd - 1) : hd, big ? y - 1 : y, big ? 3 : 2, big ? 3 : 2, body)
-    P.rect(L_ANT, f > 0 ? hd + (big ? 3 : 2) : hd - 1, y - 1, 1, 1, body)
-    for (let k = 0; k < 3; k++) P.rect(L_ANT, x + 1 + k * 2 + ((k + flip) % 2), y + 4, 1, 1, body)
-    if (a.job === 'swarm') P.rect(L_FX, hd, y - 2, 2, 1, '#ff5a3c')
-    if (a.carry) P.rect(L_FX, f > 0 ? hd + 1 : hd - 2, y - 2, sp.carry ? 4 : 3, sp.carry ? 3 : 2, a.carry === 3 ? '#7a5a3a' : a.carry === 2 ? '#c9472f' : leaf)
+    drawAnt(P, x - 0.5, y, f, body, { big: a.kind === 'm', flip: (flip + i) % 2, alarm: a.job === 'swarm', carry: a.carry ? (a.carry === 3 ? '#7a5a3a' : a.carry === 2 ? '#c9472f' : leaf) : undefined })
   }
   // 여왕: 크고 날개 자국이 있다
   const q = w.chambers[w.queen.room]!, qx = q.cx * S - 6, qy = (q.cy + q.ry) * S - 3
-  P.rect(L_ANT, qx, qy, 8, 5, '#140c08'); P.rect(L_ANT, qx + 1, qy, 6, 1, '#3a2418'); P.rect(L_ANT, qx + 8, qy + 1, 4, 3, '#5a2a14'); P.rect(L_ANT, qx + 12, qy, 3, 3, '#140c08')
-  P.rect(L_ANT, qx + 9, qy - 2, 3, 2, 'rgba(230,220,200,.5)'); P.rect(L_ANT, qx + 15, qy - 1, 1, 1, '#140c08')
-  for (let k = 0; k < 3; k++) P.rect(L_ANT, qx + 7 + k * 2 + ((k + flip) % 2), qy + 5, 1, 1, '#140c08')
+  drawAnt(P, qx - 1, qy - 2, 1, sp.body, { queen: true, flip })
   // 천적
   for (const t of w.threats) {
     if (t.k === 'spider') {
@@ -307,20 +298,40 @@ export function raster(w: World, ants: Ant[]) {
   return { cells: bytes.toBase64(), columns: W, rows }
 }
 
-// ---------- 도감 카드용 손님 캐릭터 (16×10 칸 도트, 못 찾은 손님은 검은 실루엣) ----------
-const SPRITES: Record<string, [number, number, number, number, string][]> = {
-  cricket: [[2, 4, 9, 4, '#8a6a42'], [3, 4, 7, 1, '#a88658'], [11, 3, 2, 2, '#6e5232'], [13, 1, 1, 2, '#6e5232'], [14, 0, 2, 1, '#6e5232'], [1, 8, 2, 1, '#6e5232'], [5, 8, 1, 2, '#6e5232'], [8, 8, 1, 2, '#6e5232'], [0, 6, 2, 1, '#5a4228']],
-  rove: [[2, 4, 11, 3, '#1c1410'], [3, 4, 4, 1, '#6a3a1c'], [13, 4, 2, 2, '#1c1410'], [15, 3, 1, 1, '#1c1410'], [4, 7, 1, 2, '#1c1410'], [8, 7, 1, 2, '#1c1410'], [11, 7, 1, 2, '#1c1410']],
-  lycaenid: [[3, 4, 10, 4, '#9bc46a'], [4, 3, 8, 1, '#b6d88a'], [4, 4, 8, 1, '#c4e29a'], [12, 5, 2, 2, '#7aa04a'], [5, 8, 1, 1, '#6a8a3a'], [8, 8, 1, 1, '#6a8a3a'], [11, 8, 1, 1, '#6a8a3a']],
-  niphanda: [[3, 4, 10, 4, '#d8c8a8'], [4, 3, 8, 1, '#efe4cc'], [12, 5, 2, 2, '#b8a888'], [2, 1, 12, 1, '#ffd75a'], [5, 8, 1, 1, '#a89878'], [9, 8, 1, 1, '#a89878']],
-  attaphila: [[5, 5, 6, 3, '#c49a5a'], [6, 4, 4, 1, '#d8b47a'], [11, 6, 1, 1, '#a07a3a'], [12, 5, 2, 1, '#a07a3a'], [5, 8, 1, 1, '#8a6a3a'], [9, 8, 1, 1, '#8a6a3a']],
-  antbird: [[3, 3, 8, 5, '#3a3a3a'], [10, 1, 4, 4, '#1e1e1e'], [14, 2, 2, 1, '#d8d0a0'], [11, 2, 1, 1, '#f0f0f0'], [0, 4, 4, 2, '#2a2a2a'], [5, 4, 4, 2, '#545454'], [6, 8, 1, 2, '#8a7a5a'], [9, 8, 1, 2, '#8a7a5a']],
-  silverfish: [[2, 5, 10, 2, '#b8c0c8'], [3, 4, 8, 1, '#d4dae0'], [12, 5, 2, 1, '#8a9298'], [14, 4, 2, 1, '#8a9298'], [0, 6, 2, 1, '#8a9298'], [0, 4, 2, 1, '#8a9298']],
-  gynandro: [[1, 4, 5, 4, '#140c08'], [6, 5, 3, 2, '#140c08'], [9, 4, 3, 3, '#b84a1e'], [12, 3, 3, 3, '#b84a1e'], [14, 1, 1, 2, '#b84a1e'], [2, 8, 1, 2, '#140c08'], [6, 8, 1, 2, '#140c08'], [10, 8, 1, 2, '#b84a1e'], [0, 0, 16, 1, '#ffd75a']],
+// ---------- 개미 한 마리: 0.5px 단위로 배·허리·가슴·머리, 눈, 큰턱, 꺾인 더듬이, 두 마디 다리 ----------
+type AntOpt = { big?: boolean; queen?: boolean; flip: number; alarm?: boolean; carry?: string }
+function drawAnt(P: Painter, x: number, y: number, f: number, base: string, o: AntOpt) {
+  const u = o.queen ? 0.85 : 0.5, L = o.queen ? L_ITEM + 1 : L_ANT
+  const dark = mix(base, '#000000', 0.35), hi = mix(base, '#ffffff', 0.35)
+  const R = (dx: number, dy: number, w: number, h: number, c: string) => P.rect(L, f > 0 ? x + dx * u : x + (16 - dx - w) * u, y + dy * u, w * u, h * u, c)
+  // 배(gaster): 둥글게, 위쪽에 빛
+  R(1, 3, 4, 1, base); R(0, 4, 6, 3, base); R(1, 7, 4, 1, dark); R(1, 4, 2, 1, hi)
+  if (o.queen) { R(-1, 4, 1, 3, dark); R(0, 2, 5, 1, base); R(-1, 3, 2, 1, base) }
+  R(6, 5, 1, 1, dark)                       // 허리(petiole)
+  R(7, 4, 3, 2, base); R(7, 6, 2, 1, dark)  // 가슴
+  if (o.queen) R(7, 3, 2, 1, hi)
+  if (o.big) { R(10, 1, 5, 5, base); R(11, 1, 3, 1, hi); R(13, 2, 1, 1, '#f2e2c4'); R(15, 4, 1, 2, dark); R(14, 0, 1, 1, dark); R(15, -1, 1, 1, dark) }
+  else { R(10, 3, 3, 3, base); R(11, 2, 2, 1, base); R(12, 3, 1, 1, '#f2e2c4'); R(13, 5, 1, 1, dark); R(12, 1, 1, 1, dark); R(13, 0, 2, 1, dark) }
+  // 다리 세 쌍: 프레임마다 번갈아 앞뒤로
+  for (let k = 0; k < 3; k++) { const lx = 7 + k, d = (k + o.flip) % 2 ? 1 : -1; R(lx, 7, 1, 2, dark); R(lx + d, 9, 1, 1, dark) }
+  if (o.queen) { R(6, 1, 4, 1, 'rgba(235,230,215,.55)'); R(5, 0, 3, 1, 'rgba(235,230,215,.4)') }   // 날개를 뗀 자국
+  if (o.alarm) R(10, -1, 3, 1, '#ff5a3c')
+  if (o.carry) R(13, -1, 4, 3, o.carry)
 }
-export function guestIcon(id: string, found: boolean, px = 5) {
-  const parts = (SPRITES[id] ?? []).filter(([, , , , c]) => found || c !== '#ffd75a')
-    .map(([x, y, w, h, c]) => `<rect x="${x * px}" y="${y * px}" width="${w * px}" height="${h * px}" fill="${found ? c : '#2a2622'}"/>`).join('')
-  const W2 = 16 * px, H2 = 10 * px
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W2} ${H2}" width="${W2}" height="${H2}" shape-rendering="crispEdges"><rect width="${W2}" height="${H2}" rx="6" fill="${found ? '#efe4d2' : '#cfc6ba'}"/>${parts}</svg>`
+
+// ---------- 도감 카드용 손님 그림: 매끈한 윤곽선 일러스트 ----------
+const ICONS: Record<string, string> = {
+  cricket: `<ellipse cx="34" cy="30" rx="16" ry="7" fill="#9a7448" stroke="#4a3420" stroke-width="1.5"/><ellipse cx="18" cy="28" rx="6" ry="5" fill="#8a6640" stroke="#4a3420" stroke-width="1.5"/><path d="M40 30 L58 20 L62 36" fill="none" stroke="#6e5232" stroke-width="3" stroke-linejoin="round"/><path d="M14 25 Q4 10 2 4 M16 24 Q10 8 12 2" fill="none" stroke="#6e5232" stroke-width="1.2"/><path d="M26 36 l-3 6 M32 37 l0 6 M48 33 l6 4" stroke="#4a3420" stroke-width="1.5"/><path d="M50 28 l14 -2 M50 31 l13 3" stroke="#6e5232" stroke-width="1"/><circle cx="16" cy="27" r="1.3" fill="#1a1008"/>`,
+  rove: `<rect x="8" y="24" width="50" height="10" rx="5" fill="#2a1e18" stroke="#0e0806" stroke-width="1.5"/><rect x="22" y="23" width="14" height="12" rx="3" fill="#7a3e1c" stroke="#0e0806" stroke-width="1.2"/><circle cx="62" cy="29" r="6" fill="#2a1e18" stroke="#0e0806" stroke-width="1.5"/><path d="M8 29 q-6 -8 -4 -14" fill="none" stroke="#2a1e18" stroke-width="3"/><path d="M66 25 l8 -6 M66 32 l8 5" stroke="#2a1e18" stroke-width="1.2"/><path d="M26 34 l-3 7 M36 34 l0 7 M46 34 l3 7" stroke="#0e0806" stroke-width="1.4"/>`,
+  lycaenid: `${[0, 1, 2, 3, 4, 5].map(k => `<ellipse cx="${14 + k * 9}" cy="${30 - Math.sin(k) * 1.5}" rx="7" ry="8" fill="${k % 2 ? '#a8cf74' : '#9bc46a'}" stroke="#5c7a34" stroke-width="1.2"/>`).join('')}<circle cx="63" cy="31" r="5" fill="#7a9a46" stroke="#4c6a26" stroke-width="1.2"/><path d="M14 22 q20 -6 44 0" fill="none" stroke="#d4ec9a" stroke-width="2"/><circle cx="44" cy="20" r="2" fill="#fff6c0"/>`,
+  niphanda: `${[0, 1, 2, 3, 4, 5].map(k => `<ellipse cx="${14 + k * 9}" cy="30" rx="7" ry="8" fill="${k % 2 ? '#e2d4b6' : '#d6c6a4'}" stroke="#8a7a5a" stroke-width="1.2"/>`).join('')}<circle cx="63" cy="31" r="5" fill="#b8a888" stroke="#7a6a4a" stroke-width="1.2"/><path d="M12 18 q26 -8 52 0" fill="none" stroke="#ffd75a" stroke-width="2.5"/><path d="M38 6 l2 5 5 1 -4 3 1 5 -4 -3 -4 3 1 -5 -4 -3 5 -1z" fill="#ffd75a"/>`,
+  attaphila: `<ellipse cx="38" cy="30" rx="14" ry="9" fill="#c49a5a" stroke="#6a4a22" stroke-width="1.5"/><path d="M26 30 q12 -12 24 0" fill="none" stroke="#e0bc84" stroke-width="2"/><path d="M52 27 q10 -6 14 -12 M52 31 q10 2 16 -2" fill="none" stroke="#6a4a22" stroke-width="1"/><path d="M30 38 l-4 6 M38 39 l0 6 M46 38 l4 6" stroke="#6a4a22" stroke-width="1.4"/><ellipse cx="14" cy="38" rx="9" ry="4" fill="#efe2c4" stroke="#b8a070" stroke-width="1"/>`,
+  antbird: `<path d="M12 32 Q20 18 40 20 Q56 22 58 30 Q52 40 34 40 Q20 40 12 32z" fill="#3e3e40" stroke="#141414" stroke-width="1.5"/><circle cx="56" cy="22" r="8" fill="#232325" stroke="#141414" stroke-width="1.5"/><path d="M63 22 l10 2 -10 2z" fill="#d8cc9a" stroke="#6a6040" stroke-width="1"/><circle cx="58" cy="20" r="1.6" fill="#f4f4f0"/><path d="M14 30 L2 26 L4 34z" fill="#2a2a2c"/><path d="M26 26 Q36 22 46 28" fill="none" stroke="#6a6a6e" stroke-width="2"/><path d="M34 40 l-2 6 M40 40 l2 6" stroke="#8a7a5a" stroke-width="1.6"/>`,
+  silverfish: `<path d="M10 30 Q30 20 56 26 Q64 30 56 34 Q30 40 10 30z" fill="#c4ccd4" stroke="#6a7278" stroke-width="1.4"/><path d="M14 30 Q32 26 54 30" fill="none" stroke="#e8eef2" stroke-width="2"/><path d="M58 28 q10 -8 16 -10 M58 32 q10 4 16 4" fill="none" stroke="#6a7278" stroke-width="1"/><path d="M10 30 l-8 -6 M10 30 l-9 0 M10 30 l-8 6" stroke="#6a7278" stroke-width="1"/>`,
+  gynandro: `<ellipse cx="18" cy="30" rx="11" ry="8" fill="#1a110c" stroke="#000" stroke-width="1.2"/><circle cx="31" cy="30" r="2" fill="#3a2a20"/><ellipse cx="40" cy="29" rx="7" ry="5" fill="#8a3a1a" stroke="#4a1a08" stroke-width="1.2"/><circle cx="54" cy="26" r="7" fill="#c24e20" stroke="#5a2008" stroke-width="1.2"/><path d="M58 20 l6 -8 4 2 M60 22 l8 -4 2 4" fill="none" stroke="#5a2008" stroke-width="1.2"/><circle cx="56" cy="24" r="1.5" fill="#f2e2c4"/><path d="M36 34 l-4 8 M40 34 l0 8 M44 33 l4 8" stroke="#2a1a10" stroke-width="1.4"/><path d="M4 20 l70 0" stroke="#ffd75a" stroke-width="0"/><path d="M38 6 l2 5 5 1 -4 3 1 5 -4 -3 -4 3 1 -5 -4 -3 5 -1z" fill="#ffd75a"/>`,
+}
+export function guestIcon(id: string, found: boolean) {
+  const art = ICONS[id] ?? ''
+  const body = found ? art : art.replace(/fill="[^"]+"/g, 'fill="#3a342e"').replace(/stroke="#(?!3a342e)[^"]+"/g, 'stroke="#2a2420"').replace(/<path d="M38 6[^>]*\/>/g, '')
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 50" width="80" height="50"><rect width="80" height="50" rx="8" fill="${found ? '#f3ead8' : '#d4ccc0'}"/>${body}</svg>`
 }

@@ -25,7 +25,8 @@ The colony's food and weather come from how you use AI. The mod never reads your
 | Any successful tool call | Nurses feed the brood, so it hatches faster: your work hatches ants |
 | Explore: read files, search, web research | Foragers climb trees and bring back honeydew |
 | Edit and write files | Digging: new tunnels and chambers. More storage rooms mean bigger reserves |
-| Tests or builds pass | A successful hunt: protein, which grows majors (big-headed soldiers) |
+| Verify: tests, builds, browser checks, server checks (Bash or PowerShell) | A successful hunt: protein, which grows majors (big-headed soldiers) |
+| Ship: commit, push, PR, deploy | A celebration flight of winged ants, plus food and faster brood |
 | Delegate to a subagent | The queen lays extra eggs |
 | Several agents at once, workflows, worktrees | An expedition files out of the nest |
 | Use an MCP server (external tool) | Each server becomes an outside pasture: a new aphid tree the ants herd |
@@ -55,7 +56,7 @@ From that it picks your starting colony:
 - **Species:** heavy MCP use → leafcutter ants, automation → honeypot ants, parallel agents → army ants, delegation → samurai ants, otherwise Japanese carpenter ants (or wood ants for newcomers)
 - **Head start:** your MCP servers become outside pastures, skills become pheromone trails, hooks become instinct
 
-Only the 15 most recent conversation files under 4 MB are read.
+The 30 most recent conversations are read, large ones streamed line by line.
 
 ## Species
 
@@ -72,9 +73,9 @@ Only the 15 most recent conversation files under 4 MB are read.
 
 `/ant species` lists them; `/ant new <species>` starts a new colony with one (for example `/ant new atta`).
 
-## Guest dex
+## Creature dex
 
-Real ant nests host lodgers. Depending on your species, guests drop in: ant crickets that beg food, rove beetles that steal brood, blue butterfly caterpillars that pay in honeydew, the legendary *Niphanda fusca* caterpillar that grows only in Japanese carpenter ant nests, the tiny roach of leafcutter gardens, antbirds that follow army ant raids, and the extremely rare gynandromorph ant, born half female and half male. They come in four rarities, and your dex carries over across generations and species. `/ant dex` shows what you have found.
+Real ant nests host lodgers. Depending on your species, guests drop in: ant crickets that beg food, rove beetles that steal brood, blue butterfly caterpillars that pay in honeydew, the legendary *Niphanda fusca* caterpillar that grows only in Japanese carpenter ant nests, the tiny roach of leafcutter gardens, antbirds that follow army ant raids, and the extremely rare gynandromorph ant, born half female and half male. They come in four rarities, and your creature dex carries over across generations and species. `/ant dex` shows what you have found.
 
 ## Gift a queen, show your card
 
@@ -89,6 +90,12 @@ A queen lives 5 to 10 game years depending on the species. Once the colony is bi
 
 Your colony level grows with peak population, years survived, bugs fixed and generations carried on. It shows on the pane and in `/ant stats`, together with the record of past generations.
 
+## AI use report
+
+The Report tab shows this week so far: how your actions split across explore, edit, verify, ship, delegate, parallel agents, MCP, skills, planning and automation, compared with last week, plus what you do well, what you use less, and what to try next. Every Monday the previous week is finalized (`/ant report last`).
+
+The dashboard shows how each number changed since yesterday, like `38 (+5)`. Several Claude Code windows open at once share one colony: one window runs it and the others pass their activity along.
+
 ## Show your colony
 
 Run `/ant stats`, take a screenshot, and post it with the [Show your colony](https://github.com/findot-ai/ant-nest/issues/new?template=show-your-colony.yml) form. Colonies appear in the Colony Hall (issues labeled `colony-hall`).
@@ -97,7 +104,8 @@ Run `/ant stats`, take a screenshot, and post it with the [Show your colony](htt
 
 - `/ant`: open the nest pane
 - `/ant stats`: your usage so far, colony type, tools learned
-- `/ant dex`: the guest dex
+- `/ant report` · `/ant report last`: your AI use report for this week, or last week's
+- `/ant dex`: the creature dex
 - `/ant gift` · `/ant adopt <code>`: gift a queen, adopt one
 - `/ant card`: write your profile card
 - `/ant species`: list the species
@@ -143,7 +151,8 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 | 성공한 도구 호출 전부 | 육아 개미가 새끼를 먹여 발육이 빨라진다: 내 작업이 개미를 부화시킨다 |
 | 탐색: 파일 읽기, 검색, 웹 조사 | 채집 개미가 나무에 올라 단물을 가져온다 |
 | 편집·작성 | 굴착, 새 방. 창고가 늘면 비축할 수 있는 양이 커진다 |
-| 테스트·빌드 통과 | 사냥 성공, 단백질 (병정개미가 자란다) |
+| 검증: 테스트·빌드, 브라우저 화면 확인, 서버 응답 확인 (Bash·PowerShell 모두) | 사냥 성공, 단백질 (병정개미가 자란다) |
+| 출시: 커밋·푸시·PR·배포 | 날개 달린 개미들의 축하 비행, 먹이와 빠른 부화 |
 | 서브에이전트에 일을 맡김 | 여왕이 알을 더 낳는다 |
 | 여러 에이전트 동시 실행, 워크플로, 워크트리 | 원정대가 줄지어 굴을 나선다 |
 | MCP 서버(외부 도구) 사용 | 서버 하나가 바깥 목초지 하나: 개미가 치는 진딧물 나무가 새로 생긴다 |
@@ -173,7 +182,7 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 - **종:** MCP를 많이 쓰면 잎꾼개미, 자동화는 꿀단지개미, 병렬 에이전트는 군대개미, 위임은 사무라이개미, 그 외에는 일본왕개미(처음이면 곰개미)
 - **출발 보너스:** 내 MCP 서버는 바깥 목초지, 스킬은 페로몬 길, 훅은 본능이 됩니다
 
-최근 대화 파일 중 4MB 이하인 15개만 읽습니다.
+최근 대화 30개를 읽고, 큰 대화는 줄 단위로 흘려 읽습니다.
 
 ## 개미종
 
@@ -190,9 +199,9 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 `/ant species`로 목록을 보고, `/ant new <종>`으로 그 종의 새 군락을 시작합니다(예: `/ant new atta`).
 
-## 개미집 손님 도감
+## 생물 도감
 
-실제 개미집에는 더부살이 손님이 삽니다. 종에 따라 이런 손님이 찾아옵니다.
+실제 개미집에는 개미와 함께 사는 생물이 있습니다. 종에 따라 이런 생물이 찾아옵니다.
 
 - 먹이를 얻어먹는 개미집귀뚜라미
 - 새끼를 훔쳐 먹는 개미반날개
@@ -202,7 +211,7 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 - 군대개미 행렬을 따라다니는 개미새
 - 몸 절반은 암컷, 절반은 수컷인 아주 드문 암수한몸 개미
 
-희귀도는 네 단계이고, 도감은 세대와 종을 바꿔도 이어집니다. `/ant dex`로 봅니다.
+희귀도는 네 단계이고, 생물 도감은 세대와 종을 바꿔도 이어집니다. `/ant dex`로 봅니다.
 
 ## 여왕 선물하기, 군락 카드
 
@@ -215,6 +224,12 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 군락 레벨은 최대 개체수, 버틴 햇수, 고친 버그, 이어 간 세대로 오릅니다. 창과 `/ant stats`에 이전 세대 기록과 함께 나옵니다.
 
+## AI 활용 리포트
+
+리포트 탭에서 이번 주 지금까지의 활동을 봅니다. 탐색·편집·검증·출시·위임·병렬·MCP·스킬·계획·자동화의 비중, 지난주 대비 변화, 잘하고 있는 점·덜 쓰는 점·다음에 해 볼 것이 나옵니다. 매주 월요일에 지난주 리포트가 확정됩니다(`/ant report last`).
+
+대시보드 숫자 옆에는 어제 대비 변화가 `38 (+5)`처럼 붙습니다. Claude Code 창을 여러 개 열어도 군락은 하나입니다. 한 창이 군락을 돌리고, 나머지 창은 자기 활동을 그 창에 넘깁니다.
+
 ## 내 군락 자랑하기
 
 `/ant stats` 결과와 스크린샷을 [내 군락 자랑하기](https://github.com/findot-ai/ant-nest/issues/new?template=show-your-colony.yml) 양식으로 올려 주세요. `colony-hall` 라벨이 붙은 이슈가 군락 명예의 전당이 됩니다.
@@ -223,7 +238,8 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 - `/ant`: 개미굴 창 열기
 - `/ant stats`: 지금까지의 활용, 군락 유형, 배운 도구
-- `/ant dex`: 손님 도감
+- `/ant report` · `/ant report last`: 이번 주 AI 활용 리포트, 지난주 리포트
+- `/ant dex`: 생물 도감
 - `/ant gift` · `/ant adopt <코드>`: 여왕 선물하기, 입양하기
 - `/ant card`: 프로필 카드 만들기
 - `/ant species`: 개미종 목록

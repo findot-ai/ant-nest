@@ -1,4 +1,4 @@
-// 개미집 손님(공생·기생 생물) 도감. 실제로 개미와 함께 사는 생물을 종별로 골랐다.
+// 개미집 생물(공생·기생 생물) 도감. 실제로 개미와 함께 사는 생물을 종별로 골랐다.
 import type { SpeciesId } from './species'
 
 export type GuestId = 'cricket' | 'rove' | 'lycaenid' | 'niphanda' | 'attaphila' | 'antbird' | 'silverfish' | 'gynandro'

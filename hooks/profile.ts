@@ -12,7 +12,7 @@ export type Profile = {
   mcpServers: string[]; skills: number; hooks: number
 }
 export const emptyProfile = (): Profile => ({
-  calls: 0, sessions: 0, kinds: { explore: 0, build: 0, hunt: 0, raise: 0, mcp: 0, skill: 0, auto: 0, plan: 0, parallel: 0, other: 0 },
+  calls: 0, sessions: 0, kinds: { explore: 0, build: 0, hunt: 0, raise: 0, mcp: 0, skill: 0, auto: 0, plan: 0, parallel: 0, ship: 0, other: 0 },
   prompts: 0, words: { debug: 0, research: 0, plan: 0, automate: 0, build: 0 }, mcpServers: [], skills: 0, hooks: 0,
 })
 
@@ -25,8 +25,8 @@ const WORDS: [keyof Profile['words'], RegExp][] = [
 ]
 
 // 대화 기록 한 파일: 도구 이름과 사용자 프롬프트의 키워드 갈래만 센다
-export function scanTranscript(text: string, p: Profile) {
-  p.sessions++
+export function scanTranscript(text: string, p: Profile, countSession = true) {
+  if (countSession) p.sessions++
   const toolRe = /"type":"tool_use","id":"[^"]*","name":"([^"]+)"(?:,"input":(\{[^{}]{0,200}))?/g
   for (let m; (m = toolRe.exec(text)); ) {
     const input: Record<string, unknown> = {}

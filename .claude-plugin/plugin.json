@@ -1,6 +1,6 @@
 {
   "name": "ant-nest",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "An ant colony that grows with how you use AI: exploring forages, editing digs, passing tests hunts, repeated errors bring predators. / 내 AI 활용으로 자라는 개미굴: 탐색은 채집, 편집은 굴착, 테스트 통과는 사냥, 반복 오류는 천적이 된다.",
   "types": "./types/index.d.ts",
   "license": "MIT",

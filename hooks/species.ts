@@ -5,7 +5,7 @@ export type Species = {
   id: SpeciesId; ko: string; en: string; sci: string; koDesc: string; enDesc: string
   climate: Climate; life: number            // 여왕 수명(게임 년)
   devK: number; layK: number; majorK: number; storeK: number
-  boost: Partial<Record<'explore' | 'build' | 'hunt' | 'raise' | 'mcp' | 'skill' | 'auto' | 'plan' | 'parallel', number>>
+  boost: Partial<Record<'explore' | 'build' | 'hunt' | 'raise' | 'mcp' | 'skill' | 'auto' | 'plan' | 'parallel' | 'ship', number>>
   body: string; major: string; flightPop: number
   storeKo?: string; storeEn?: string
   succession: 'found' | 'adopt' | 'fission'   // 새 여왕이 창업 / 기존 군락이 젊은 여왕을 받아들임 / 군락이 둘로 갈라짐
