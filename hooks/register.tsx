@@ -8,6 +8,13 @@ import {
 import { emptyProfile, scanTranscript, scanHistory, scanSettings, pickSetup } from './profile'
 import { SPECIES, SPECIES_IDS } from './species'
 import { GUESTS, RARITY_KO, RARITY_EN, guestById } from './guests'
+// 생물이 군락에 하는 일 (engine.ts guestDay와 같은 수치)
+const EFFECT = {
+  drain: ['역할: 먹이를 얻어먹음 (게임 하루 당분 -0.6)', 'Role: begs food (−0.6 sugar per game day)'],
+  brood: ['역할: 가끔 알·애벌레를 먹음 (게임 하루 새끼 -0.5)', 'Role: eats brood now and then (−0.5 per game day)'],
+  honeydew: ['역할: 단물을 줌 (게임 하루 당분 +1.2)', 'Role: gives honeydew (+1.2 sugar per game day)'],
+  none: ['역할: 군락에 영향 없음, 보기 드문 손님', 'Role: no effect, just a rare sight'],
+} as const
 import type { GuestId } from './guests'
 import type { SpeciesId } from './species'
 import type { World, Ant, Tally, Lang, LogLine } from './engine'
@@ -17,7 +24,7 @@ import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
-const VERSION = '0.14.1'
+const VERSION = '0.14.2'
 const PANE = 'ant-nest'
 // 접속 75초 = 게임 1시간, 접속 30분 = 게임 하루, 약 35시간 = 게임 1년. 한 세대(여왕 수명 5~10년)는 매일 쓰면 현실 약 3개월
 const FRAME_MS = 500, FRAMES_PER_HOUR = 150
@@ -467,6 +474,7 @@ export const register: Register = (on, options) => {
                 <Text size="footnote" weight="semibold" dimColor={!d}>{d ? (en ? g.en : g.ko) : '？？？？'}</Text>
                 <Text size="caption" color={g.rarity >= 3 ? 'warning' : undefined} dimColor={g.rarity < 3}>{stars} {r}{d ? ` · ×${d.n}` : ''}</Text>
                 <Text size="caption" dimColor>{d ? (en ? g.enDesc : g.koDesc) : `${en ? 'Lives with' : '사는 곳'}: ${host}`}</Text>
+                {d && <Text size="caption" color={g.effect === 'honeydew' ? 'success' : g.effect === 'none' ? undefined : 'warning'}>{EFFECT[g.effect][en ? 1 : 0]}{w.guests.some(v => v.id === g.id) ? (en ? ' · in the nest now' : ' · 지금 굴에 있음') : ''}</Text>}
               </Box>
             )
           })}

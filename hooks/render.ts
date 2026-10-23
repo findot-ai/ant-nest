@@ -1,5 +1,6 @@
 import { W, H, SURF, CM, SKY, SOIL, TUN, ROCK, ROOMNAME, ROOMNAME_EN, SP, idx, layerOf, season, hour, chamberAt, frostDepth } from './engine'
 import type { World, Ant, Lang } from './engine'
+import { guestById } from './guests'
 
 const SOILC = ['#563a26', '#a47646', '#805e44', '#625852']
 const ROOMC: Record<string, string> = { queen: '#805838', brood: '#705038', store: '#684e30', waste: '#463c34' }
@@ -38,6 +39,7 @@ function sprites(w: World, ants: Ant[]): Sprite[] {
   for (const a of ants) out.push({ x: a.x, y: a.st === 'out' ? SURF - 1 - a.up : a.y, c: a.job === 'swarm' ? '#ff5a3c' : a.kind === 'm' ? '#3a2214' : '#120b07' })
   const q = w.chambers[w.queen.room]!
   out.push({ x: q.cx, y: q.cy, c: '#e3a33b' })
+  for (const g of w.guests) { out.push({ x: g.x, y: g.y, c: '#f3d98a' }); out.push({ x: g.x + 1, y: g.y, c: '#f3d98a' }) }
   for (const t of w.threats) {
     if (t.k === 'centipede') { for (const [x, y] of t.trail) out.push({ x, y, c: '#b5452c' }); out.push({ x: t.x, y: t.y, c: '#e06030' }) }
     else out.push({ x: t.x, y: t.y, c: '#e8e4da' })
@@ -242,19 +244,11 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288, fr = 
     }
     P.rect(L_TERR, WW - 14, GY - 7, 14, 7, '#8a6a46'); P.rect(L_TERR, WW - 10, GY - 9, 8, 2, '#8a6a46')
   }
-  // 개미집 손님
-  for (const g of w.guests) {
-    const x = g.x * S, y = g.y * S + 1
-    switch (g.id) {
-      case 'cricket': P.rect(L_ANT, x, y + 1, 5, 3, '#8a6a42'); P.rect(L_ANT, x + 5, y, 1, 1, '#8a6a42'); P.rect(L_ANT, x + 6, y - 1, 2, 1, '#8a6a42'); P.rect(L_ANT, x - 1, y + 4, 2, 1, '#6e5232'); break
-      case 'rove': P.rect(L_ANT, x, y + 2, 7, 2, '#1c1410'); P.rect(L_ANT, x + 1, y + 1, 2, 1, '#6a3a1c'); break
-      case 'lycaenid': P.rect(L_ANT, x, y + 1, 6, 3, '#9bc46a'); P.rect(L_ANT, x + 1, y + 1, 4, 1, '#c4e29a'); break
-      case 'niphanda': P.rect(L_ANT, x, y + 1, 6, 3, '#d8c8a8'); P.rect(L_ANT, x + 1, y + 1, 4, 1, '#efe4cc'); P.rect(L_FX, x - 1, y - 2, 8, 1, 'rgba(255,215,90,.8)'); break
-      case 'attaphila': P.rect(L_ANT, x, y + 2, 3, 2, '#c49a5a'); break
-      case 'antbird': P.rect(L_FX, x - 4, y, 8, 5, '#3a3a3a'); P.rect(L_FX, x + 3, y - 2, 4, 3, '#1e1e1e'); P.rect(L_FX, x + 7, y - 1, 2, 1, '#d8d0a0'); P.rect(L_FX, x - 6, y + 1, 3, 2, '#2a2a2a'); break
-      case 'silverfish': P.rect(L_ANT, x, y + 2, 6, 2, '#b8c0c8'); P.rect(L_ANT, x + 6, y + 2, 2, 1, '#8a9298'); break
-      case 'gynandro': P.rect(L_ANT, x, y + 1, 3, 3, '#140c08'); P.rect(L_ANT, x + 3, y + 1, 2, 2, '#7a3a1a'); P.rect(L_ANT, x + 5, y, 2, 2, '#b84a1e'); P.rect(L_FX, x - 1, y - 2, 8, 1, 'rgba(255,215,90,.8)'); break
-    }
+  // 개미집 생물: 도감 카드와 같은 그림을 줄여서, 은은한 빛 위에 그린다
+  for (const [k, g] of w.guests.entries()) {
+    const cx = g.x * S + S / 2, floor = g.y * S + S - 2 - (Math.floor(fr / 2 + k) % 4 === 0 ? 1 : 0), sway = Math.sin(fr * 0.15 + k * 2) * 3
+    P.raw(L_ITEM, `<ellipse cx="${cx}" cy="${floor - 7}" rx="16" ry="10" fill="url(#glow)"/><ellipse cx="${cx}" cy="${floor - 7}" rx="14" ry="9" fill="rgba(255,236,190,.3)"/>`)
+    P.raw(L_FX, `<g transform="translate(${(cx - 12 + sway).toFixed(1)} ${floor - 15}) scale(.3)">${ICONS[g.id] ?? ''}</g>`)
   }
   // 결혼비행: 날개 달린 신여왕과 수개미가 하늘을 난다
   // 입구에서 차례로 날아올라 바람을 타고 하늘 밖으로 사라진다
@@ -276,13 +270,14 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288, fr = 
   // 글자: 배경 상자를 깔고, 겹치면 생략
   const boxes: [number, number, number, number][] = []
   const label = (text: string, cx: number, y: number, fg: string, bg: string) => {
-    const wdt = text.length * 4.4 + 6, x = Math.max(2, Math.min(WW - wdt - 2, cx - wdt / 2))
+    const wdt = [...text].reduce((a, ch) => a + (ch.charCodeAt(0) > 0x2e80 ? 7.6 : 4.4), 6), x = Math.max(2, Math.min(WW - wdt - 2, cx - wdt / 2))
     if (boxes.some(([bx, by, bw, bh]) => x < bx + bw && x + wdt > bx && y - 8 < by + bh && y + 2 > by)) return
     boxes.push([x, y - 8, wdt, 10])
     P.raw(L_TXT, `<rect x="${x.toFixed(1)}" y="${y - 8}" width="${wdt.toFixed(1)}" height="10" rx="2" fill="${bg}"/><text x="${(x + wdt / 2).toFixed(1)}" y="${y}" font-size="7.5" text-anchor="middle" fill="${fg}">${text.replace(/[<>&"]/g, '')}</text>`)
   }
   label(sp.bivouac ? (lang === 'en' ? 'Bivouac' : '비박') : lang === 'en' ? 'Queen' : '여왕', q.cx * S + 3, (q.cy - q.ry) * S - 2, '#1a120a', '#e3a33b')
   for (const c of w.chambers) if (c.type !== 'queen') label(RN[c.type], c.cx * S + 3, (c.cy - c.ry) * S - 2, '#efe4d2', 'rgba(20,14,10,.72)')
+  for (const g of w.guests) { const d = guestById(g.id); label(lang === 'en' ? d.en : d.ko, g.x * S + S / 2, g.y * S + S + 9, '#2a1a08', '#f3d98a') }
   // 목초지 이름은 그림 위에 쓰지 않는다 (대시보드에서 보여 준다)
   if (fd > 0) label(`${lang === 'en' ? 'Frost line' : '동결선'} ${fd}cm`, WW - 40, GY + (fd / CM) * S - 2, '#0b1a2a', 'rgba(220,240,255,.9)')
   // 깊이 눈금

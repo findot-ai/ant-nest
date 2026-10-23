@@ -3,6 +3,11 @@
 Every version of Ant Nest, newest first. Each entry is written in English, then Korean.
 개미굴의 모든 버전 기록입니다. 최신순이고, 각 항목은 영문 다음 국문입니다.
 
+## 0.14.2
+
+- Creatures that visit the nest are now easy to see: drawn like their dex card, on a soft glow, with a name tag. Each dex card shows what the creature does to the colony and whether it is in the nest now.
+- 찾아온 생물이 굴 안에 잘 보입니다: 도감 카드와 같은 그림이 은은한 빛 위에 이름표와 함께 나옵니다. 도감 카드에 그 생물이 군락에 하는 일과 지금 굴에 있는지가 표시됩니다.
+
 ## 0.14.1
 
 - Winged ants now gather on the grass, take off one by one and fly off the screen in about three minutes, instead of hovering in place. Rain, snow and slave-raid columns move smoothly.
