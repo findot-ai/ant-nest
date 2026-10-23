@@ -17,7 +17,7 @@ import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
-const VERSION = '0.12.0'
+const VERSION = '0.13.0'
 const PANE = 'ant-nest'
 // 접속 75초 = 게임 1시간, 접속 30분 = 게임 하루, 약 35시간 = 게임 1년. 한 세대(여왕 수명 5~10년)는 매일 쓰면 현실 약 3개월
 const FRAME_MS = 500, FRAMES_PER_HOUR = 150
@@ -78,7 +78,8 @@ export const register: Register = (on, options) => {
   let muted = false, hidden = false, cwd = ''
   const quiet = () => muted || hidden   // 숨김: 화면만 안 띄우고 활동은 계속 센다
 
-  const bump = (k: keyof Tally) => { w.today[k]++; w.total[k]++; w.week ??= emptyTally(); w.week[k] = (w.week[k] ?? 0) + 1 }
+  // 예전 버전 저장 데이터에 없는 갈래가 있어도 0부터 센다
+  const bump = (k: keyof Tally) => { w.week ??= emptyTally(); for (const x of [w.today, w.total, w.week]) x[k] = (x[k] ?? 0) + 1 }
   const gain = (n: number) => { const g = Math.max(0, Math.min(n, 8 - hourGain)); hourGain += g; return g }
   // 상태줄에 새로 쓸 글이 있으면 돌려준다
   const statusText = () => {
@@ -147,7 +148,7 @@ export const register: Register = (on, options) => {
         w.brood.push({ st: 'egg', n: 1, dev: 0, prot: 0, room: w.queen.room })
         say(w, '여러 에이전트를 동시에 보냈다. 원정대가 줄지어 굴을 나선다.', 'Several agents went out at once. An expedition files out of the nest.')
         break
-      default: if (tool === 'Bash' || tool === 'PowerShell') w.carb += gain(0.2)
+      default: bump('other'); if (tool === 'Bash' || tool === 'PowerShell') w.carb += gain(0.2)
     }
     return toast
   }
@@ -385,6 +386,8 @@ export const register: Register = (on, options) => {
     const threats = w.threats.map(x => (x.k === 'centipede' ? (en ? `⚠ Centipede inside: make the failing ${x.tool} call succeed to drive it out` : `⚠ 지네 침입: 실패하던 ${x.tool}를 다시 성공시키면 물리칩니다`) : (en ? '⚠ Spider web on the trail: fix the error to cut it down' : '⚠ 길목에 거미줄: 오류를 고치면 걷어 냅니다')))
     if (w.raid) threats.push(en ? '⚔ The samurai raiders are out on a slave raid' : '⚔ 사무라이개미 습격대가 노예사냥을 나갔습니다')
     if (sp.bivouac) threats.push(armyPhase(w) === 'statary' ? (en ? '⛺ Statary phase: the queen lays in a burst' : '⛺ 정착기: 여왕이 한꺼번에 알을 낳습니다') : (en ? '🧭 Nomadic phase: the colony moves every night' : '🧭 유랑기: 밤마다 자리를 옮깁니다'))
+    if (w.need?.dig) threats.push(en ? '🔧 The rooms are crowded: the colony is putting hands into digging' : '🔧 방이 비좁아 굴착에 일손을 돌리는 중')
+    if (w.need?.hunt) threats.push(en ? '🦗 Short on protein: a hunting party has formed' : '🦗 단백질 부족: 사냥조 편성')
     if (isWinterNow()) threats.push(en ? '❄ Winter: the ants are huddled deep. AI use is stored as reserves' : '❄ 겨울: 개미들이 깊은 방에서 멈춰 있습니다. 이 동안의 AI 활용은 비축으로 쌓입니다')
 
     const card = (title: string, body: RenderChildren) => (
@@ -484,7 +487,7 @@ export const register: Register = (on, options) => {
     const rep = buildReport(w.week ?? emptyTally(), w.lastWeek?.tally, lang), rmax = Math.max(1, ...rep.rows.map(r => r.n))
     const report = (
       <Box flexDirection="column" gap={1}>
-        <Text size="footnote" dimColor>{en ? `This week so far · ${rep.total} actions${w.lastWeek ? ' · compared with last week' : ''}` : `이번 주 지금까지 · 활동 ${rep.total}번${w.lastWeek ? ' · 지난주와 비교' : ''}`}</Text>
+        <Text size="footnote" dimColor>{en ? `This week so far · ${rep.total} actions · counting since ${w.weekSince ?? w.snapDate ?? '-'}${w.lastWeek ? ' · compared with last week' : ''}` : `이번 주 지금까지 · 활동 ${rep.total}번 · 집계 시작 ${w.weekSince ?? w.snapDate ?? '-'}${w.lastWeek ? ' · 지난주와 비교' : ''}`}</Text>
         <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
           {rep.rows.map(r => row(r.label, `${r.n} · ${r.pct}%`, bar(r.n, rmax, 10), r.diff !== undefined ? [r.diff] : []))}
         </Box>

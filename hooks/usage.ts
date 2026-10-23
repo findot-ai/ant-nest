@@ -83,6 +83,7 @@ const LABEL: Record<string, [string, string]> = {
   explore: ['탐색 (읽기·검색·조사)', 'Explore (read, search, research)'], build: ['편집·작성', 'Edit & write'], hunt: ['검증 (테스트·빌드·브라우저 확인)', 'Verify (tests, builds, browser checks)'],
   ship: ['출시 (커밋·배포)', 'Ship (commit, deploy)'], raise: ['위임 (서브에이전트)', 'Delegate (subagents)'], parallel: ['병렬 에이전트', 'Parallel agents'],
   mcp: ['외부 도구 (MCP)', 'External tools (MCP)'], skill: ['스킬', 'Skills'], plan: ['계획', 'Planning'], auto: ['자동화 (예약·백그라운드)', 'Automation (scheduled, background)'],
+  other: ['기타 (일반 명령 등)', 'Other (plain commands, etc.)'],
 }
 export function buildReport(t: Tally, prev: Tally | undefined, lang: Lang): Report {
   const en = lang === 'en', keys = Object.keys(LABEL)
@@ -101,6 +102,8 @@ export function buildReport(t: Tally, prev: Tally | undefined, lang: Lang): Repo
     if (get(t, 'skill') < 2) { gaps.push(en ? 'Skills are barely used.' : '스킬을 거의 쓰지 않습니다.'); tips.push(en ? 'Call installed skills by name, like /skill-name.' : '설치한 스킬을 /스킬이름 처럼 이름으로 불러 보세요.') }
     if (get(t, 'plan') === 0) { gaps.push(en ? 'No planning before big tasks.' : '큰 작업 전에 계획을 세우지 않습니다.'); tips.push(en ? 'Start big tasks in plan mode so the steps are agreed first.' : '큰 작업은 계획 모드로 시작해 순서를 먼저 정해 보세요.') }
     if (get(t, 'auto') === 0) { gaps.push(en ? 'Nothing is automated yet.' : '반복 작업을 맡겨 둔 자동화가 없습니다.'); tips.push(en ? 'Schedule a recurring job, like a monthly summary. Your colony\'s instinct grows.' : '"매월 1일에 지난달 요약 보내줘" 같은 예약 실행을 걸어 보세요. 군락의 본능이 커집니다.') }
+    if (share('build') < 0.08) { gaps.push(en ? 'Few edits, so the nest widens slowly. The colony digs on its own with spare food, at half the efficiency.' : '편집이 적어 굴이 더디게 넓어집니다. 군락이 남는 먹이로 직접 파지만 효율은 절반입니다.'); tips.push(en ? 'Ask Claude to write or change files directly instead of only explaining.' : '설명만 받기보다 파일을 직접 만들거나 고치게 시켜 보세요.') }
+    if (share('hunt') < 0.08) { gaps.push(en ? 'Few checks, so protein is short. The colony hunts on its own, at half the efficiency.' : '검증이 적어 단백질이 모자랍니다. 군락이 직접 사냥하지만 효율은 절반입니다.'); tips.push(en ? 'After each change, ask for a test run or a browser check.' : '바꿀 때마다 테스트 실행이나 브라우저 화면 확인까지 시켜 보세요.') }
     if (build >= 10 && hunt < build * 0.3) { gaps.push(en ? 'Edits often go unchecked.' : '편집에 비해 확인이 적습니다.'); tips.push(en ? 'Ask for a test or a browser check after each change.' : '바꿀 때마다 테스트나 화면 확인까지 시켜 보세요.') }
   }
   return { total, rows, good, gaps, tips, type: colonyType(t, lang) }

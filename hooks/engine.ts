@@ -29,10 +29,10 @@ export type Stage0 = 'found' | 'young' | 'mature'
 export type Setup = { species: SpeciesId; stage: Stage0; farms: string[]; trail: number; instinct: number; majorBias: number; storeBias: number; ko: string; en: string }
 export type Snap = { pop: number; workers: number; majors: number; raiders: number; slaves: number; brood: number; rooms: number; depth: number; carb: number; prot: number; level: number; dex: number }
 export type LogLine = { s: number; d: number; ko: string; en: string }
-export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number; ship: number }
+export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number; ship: number; other: number }
 
 export type World = {
-  v: 4; over?: boolean; snapDate?: string; snap?: Snap; weekKey?: string; week?: Tally; lastWeek?: { key: string; tally: Tally }; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
+  v: 4; over?: boolean; weekSince?: string; need?: { dig: boolean; hunt: boolean }; noteDay?: Record<string, number>; snapDate?: string; snap?: Snap; weekKey?: string; week?: Tally; lastWeek?: { key: string; tally: Tally }; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
   queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
@@ -63,7 +63,7 @@ export const idx = (x: number, y: number) => y * W + x
 export const inb = (x: number, y: number) => x >= 0 && x < W && y >= 0 && y < H
 export const layerOf = (y: number) => { const d = y - SURF; return d < 6 ? 0 : d < 22 ? 1 : d < 38 ? 2 : 3 }
 const rnd = Math.random
-export const emptyTally = (): Tally => ({ explore: 0, build: 0, hunt: 0, raise: 0, bugs: 0, fixed: 0, mcp: 0, skill: 0, auto: 0, plan: 0, parallel: 0, ship: 0 })
+export const emptyTally = (): Tally => ({ explore: 0, build: 0, hunt: 0, raise: 0, bugs: 0, fixed: 0, mcp: 0, skill: 0, auto: 0, plan: 0, parallel: 0, ship: 0, other: 0 })
 
 // ---------- 온도: T(z,t) = 12 + (계절평균−12)e^(−z/80) + 일교차·e^(−z/12)·sin(ωt − z/12) ----------
 export function airMean(w: World) {
@@ -204,7 +204,7 @@ function digStep(w: World) {
   const nx = t.x + t.dx, ny = t.y + t.dy
   if (ny < SURF + 3 || nx < 2 || nx > W - 3 || ny > H - 4 || w.grid[idx(nx, ny)] === ROCK) { t.dx = -t.dx || 1; t.dy = rnd() < 0.5 ? 1 : 0; return false }
   t.x = nx; t.y = ny; carve(w, nx, ny)
-  if (rnd() < 0.09 && w.chambers.length < Math.min(24, 6 + Math.floor((workers(w) + majors(w)) / 25))) {
+  if (rnd() < (w.need?.dig ? 0.2 : 0.09) && w.chambers.length < Math.min(24, 6 + Math.floor((workers(w) + majors(w)) / 25))) {
     const c = { brood: 0, store: 0, waste: 0 } as Record<string, number>
     for (const ch of w.chambers) c[ch.type] = (c[ch.type] ?? 0) + 1
     const type: RoomType = (c.store ?? 0) < 1 + Math.floor(w.carb / 120) ? 'store' : (c.waste ?? 0) < 1 + Math.floor(workers(w) / 200) ? 'waste' : 'brood'
@@ -348,6 +348,7 @@ export function hourTick(w: World) {
   if (w.digQueue > 0 && !isWinter(w)) { const n = Math.min(3, w.digQueue); for (let k = 0; k < n; k++) digStep(w); w.digQueue -= n }
   else if (!isWinter(w)) { let d = 0.15 + workers(w) / 200; while (d > 0) { if (d >= 1 || rnd() < d) digStep(w); d -= 1 } }
   w.fed = 0
+  needsHour(w)
   threatHour(w)
   if (w.tick % 24 === 0) dayTick(w)
 }
@@ -478,7 +479,7 @@ export function moveAnts(w: World, ants: Ant[]) {
     // 본능대로 일하기: 낮에는 알아서 채집을 나가고, 굴을 파서 흙을 밖으로 나른다
     if (a.kind === worker && canWork) {
       const r = rnd()
-      if (r < 0.006) { const tree = w.trees[Math.floor(rnd() * w.trees.length)]!, prot = rnd() < 0.2; a.job = 'forage'; a.carry = 0; a.t = prot ? 2 : 1; a.tx = prot ? 3 + Math.floor(rnd() * (W - 6)) : tree.x; a.climb = prot ? 0 : Math.max(0, tree.h - 2); a.up = 0; return }
+      if (r < (w.need?.hunt ? 0.012 : 0.006)) { const tree = w.trees[Math.floor(rnd() * w.trees.length)]!, prot = rnd() < (w.need?.hunt ? 0.7 : 0.2); a.job = 'forage'; a.carry = 0; a.t = prot ? 2 : 1; a.tx = prot ? 3 + Math.floor(rnd() * (W - 6)) : tree.x; a.climb = prot ? 0 : Math.max(0, tree.h - 2); a.up = 0; return }
       if (r < 0.01 && w.tips.length) { a.job = 'dig'; a.t = 14 + Math.floor(rnd() * 10); return }
     }
     // 그 밖에는 굴 곳곳을 돌아다닌다: 목적지에 닿거나 가끔 새 목적지를 고른다
@@ -605,7 +606,13 @@ export function feedBrood(w: World, amt: number) {
   const room = Math.max(0, 0.15 - (w.fed ?? 0)), a = Math.min(amt, room)   // 게임 1시간에 최대 0.15
   if (a <= 0) return
   w.fed = (w.fed ?? 0) + a
-  for (const b of w.brood) b.dev += a * (b.st === 'egg' ? 1.2 : 1)
+  for (const b of w.brood) {
+    if (b.st === 'larva') {
+      // 빨리 자라는 만큼 단백질도 먹어야 한다: 모자라면 그만큼만 빨라진다 (병정은 잘 먹은 애벌레에서 나온다)
+      const want = a * 0.2 * b.n, got = Math.min(w.prot, want)
+      w.prot -= got; b.prot += got; b.dev += a * (want > 0 ? got / want : 1)
+    } else b.dev += a * (b.st === 'egg' ? 1.2 : 1)
+  }
 }
 // 다음 부화까지 남은 실제 시간(분): 가장 많이 자란 고치 기준, 내 활동 가속은 빼고 계산
 export function nextHatchMinutes(w: World) {
@@ -631,8 +638,42 @@ export function rollDay(w: World, date: string, week: string) {
   let weekRolled = false
   if (w.weekKey !== week) {
     if (w.weekKey && w.week) { w.lastWeek = { key: w.weekKey, tally: w.week }; weekRolled = true }
-    w.week = emptyTally(); w.weekKey = week
+    w.week = emptyTally(); w.weekKey = week; w.weekSince = date
   }
   if (w.snapDate !== date) { w.snap = snapshot(w); w.snapDate = date; w.today = emptyTally() }
   return weekRolled
+}
+
+// ---------- 군락의 일손 재배치: 부족한 일에 남는 단물을 쓴다 (AI로 직접 하는 것보다 효율은 절반) ----------
+// 방이 비좁으면 굴착으로, 애벌레 먹일 단백질이 모자라면 사냥으로 일개미가 돌아선다
+function needsHour(w: World) {
+  if (isWinter(w)) { w.need = { dig: false, hunt: false }; return }
+  const pop = workers(w) + majors(w), rooms = w.chambers.filter(c => c.type !== 'waste').length
+  const cap = capacity(w), spare = w.carb > cap.carb * 0.2
+  const larvae = bcount(w, 'larva'), protNeed = larvae * 0.06 + 2
+  const dig = pop / Math.max(1, rooms) > 22 && spare && w.chambers.length < 24
+  const hunt = w.prot < protNeed * 2 && spare && larvae > 1
+  w.need = { dig, hunt }
+  const today = Math.floor(w.tick / 24); w.noteDay ??= {}
+  if (dig) {
+    const n = Math.min(3, Math.floor(pop / Math.max(1, rooms) / 22))
+    for (let k = 0; k < n; k++) { digStep(w); w.carb = Math.max(0, w.carb - 0.3) }
+    // 굴 끝 주변이 막혀 방을 못 만들면, 굴 중간에서 옆으로 방을 낸다
+    if (rnd() < 0.15) for (let t = 0; t < 30; t++) {
+      const x = 4 + Math.floor(rnd() * (W - 8)), y = SURF + 4 + Math.floor(rnd() * (Math.min(H - 6, w.deepest + 4) - SURF - 4))
+      if (w.grid[idx(x, y)] !== TUN || chamberAt(w, x, y)) continue
+      const dir = rnd() < 0.5 ? -1 : 1, cx = x + dir * 6, type: RoomType = w.chambers.filter(c => c.type === 'store').length < 1 + Math.floor(w.carb / 120) ? 'store' : 'brood'
+      if (!roomFree(w, cx, y, 3, 2)) continue
+      for (let k = 1; k <= 2; k++) carve(w, x + dir * k, y)
+      makeChamber(w, cx, y, 3, 2, type)
+      say(w, `일손이 남아 지하 ${(y - SURF) * CM}cm 굴 옆으로 ${ROOMNAME[type]}을 새로 냈다.`, `With hands to spare, the colony opened a new ${ROOMNAME_EN[type].toLowerCase()} chamber off the tunnel ${(y - SURF) * CM}cm down.`)
+      break
+    }
+    if (w.noteDay.dig !== today) { w.noteDay.dig = today; say(w, '방이 비좁다. 남는 단물로 일손을 굴착에 돌렸다.', 'The rooms are crowded. Spare honeydew went into digging.') }
+  }
+  if (hunt && isDay(w)) {
+    const amt = Math.min(1.5, w.carb * 0.02)
+    w.carb -= amt; w.prot += amt * 0.5
+    if (w.noteDay.hunt !== today) { w.noteDay.hunt = today; say(w, '애벌레 먹일 단백질이 모자라 일개미들이 곤충 사냥에 나섰다.', 'Not enough protein for the larvae, so workers went out hunting insects.') }
+  }
 }
