@@ -3,6 +3,11 @@
 Every version of Ant Nest, newest first. Each entry is written in English, then Korean.
 개미굴의 모든 버전 기록입니다. 최신순이고, 각 항목은 영문 다음 국문입니다.
 
+## 0.14.3
+
+- Majors stand out: bigger body, a head as large as the thorax, pale jaws and a dark outline, with a legend under the picture.
+- 병정개미가 일개미와 구분됩니다: 더 큰 몸, 가슴만 한 머리, 밝은 큰턱과 짙은 윤곽. 그림 아래에 범례를 붙였습니다.
+
 ## 0.14.2
 
 - Creatures that visit the nest are now easy to see: drawn like their dex card, on a soft glow, with a name tag. Each dex card shows what the creature does to the colony and whether it is in the nest now.

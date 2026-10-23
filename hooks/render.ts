@@ -192,7 +192,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288, fr = 
   const flip = w.tick % 2
   for (const [i, a] of ants.entries()) {
     const f = a.f ?? 1, out = a.st === 'out', climbing = out && a.up > 0
-    const body = a.job === 'swarm' ? '#2b0e07' : a.kind === 'm' ? sp.major : a.kind === 's' ? '#3b3638' : sp.body
+    const body = a.job === 'swarm' ? '#2b0e07' : a.kind === 'm' ? mix(sp.major, '#c8783a', 0.3) : a.kind === 's' ? '#3b3638' : sp.body
     const leaf = sp.carry ?? '#e8a838'
     if (climbing) {
       const x = a.x * S + (i % 2 ? 4 : -2), y = GY - 6 - a.up * S
@@ -306,16 +306,20 @@ export function raster(w: World, ants: Ant[]) {
 // ---------- 개미 한 마리: 0.5px 단위로 배·허리·가슴·머리, 눈, 큰턱, 꺾인 더듬이, 두 마디 다리 ----------
 type AntOpt = { big?: boolean; queen?: boolean; flip: number; alarm?: boolean; carry?: string }
 function drawAnt(P: Painter, x: number, y: number, f: number, base: string, o: AntOpt) {
-  const u = o.queen ? 0.85 : 0.5, L = o.queen ? L_ITEM + 1 : L_ANT
+  const u = o.queen ? 0.85 : o.big ? 0.8 : 0.5, L = o.queen ? L_ITEM + 1 : L_ANT
+  if (o.big && !o.queen) y -= 3   // 병정은 몸이 커서 바닥에 맞게 올린다
   const dark = mix(base, '#000000', 0.35), hi = mix(base, '#ffffff', 0.35)
   const R = (dx: number, dy: number, w: number, h: number, c: string) => P.rect(L, f > 0 ? x + dx * u : x + (16 - dx - w) * u, y + dy * u, w * u, h * u, c)
+  // 병정은 굴 벽에 묻히지 않게 짙은 윤곽을 먼저 깐다
+  if (o.big && !o.queen) { const K = '#080503'; R(-1, 3, 8, 6, K); R(6, 3, 5, 5, K); R(9, -1, 8, 8, K); R(15, 2, 4, 5, K) }
   // 배(gaster): 둥글게, 위쪽에 빛
   R(1, 3, 4, 1, base); R(0, 4, 6, 3, base); R(1, 7, 4, 1, dark); R(1, 4, 2, 1, hi)
   if (o.queen) { R(-1, 4, 1, 3, dark); R(0, 2, 5, 1, base); R(-1, 3, 2, 1, base) }
   R(6, 5, 1, 1, dark)                       // 허리(petiole)
   R(7, 4, 3, 2, base); R(7, 6, 2, 1, dark)  // 가슴
   if (o.queen) R(7, 3, 2, 1, hi)
-  if (o.big) { R(10, 1, 5, 5, base); R(11, 1, 3, 1, hi); R(13, 2, 1, 1, '#f2e2c4'); R(15, 4, 1, 2, dark); R(14, 0, 1, 1, dark); R(15, -1, 1, 1, dark) }
+  // 병정: 몸집이 크고, 머리가 몸통만 하며, 밝은 큰턱이 앞으로 나와 있다
+  if (o.big) { R(10, 0, 6, 6, base); R(11, 0, 4, 1, hi); R(10, 1, 1, 4, hi); R(14, 2, 1, 1, '#f2e2c4'); R(16, 3, 2, 1, '#e9c27a'); R(16, 5, 2, 1, '#e9c27a'); R(17, 4, 1, 1, '#e9c27a'); R(13, -1, 1, 1, dark); R(14, -2, 2, 1, dark) }
   else { R(10, 3, 3, 3, base); R(11, 2, 2, 1, base); R(12, 3, 1, 1, '#f2e2c4'); R(13, 5, 1, 1, dark); R(12, 1, 1, 1, dark); R(13, 0, 2, 1, dark) }
   // 다리 세 쌍: 프레임마다 번갈아 앞뒤로
   for (let k = 0; k < 3; k++) { const lx = 7 + k, d = (k + o.flip) % 2 ? 1 : -1; R(lx, 7, 1, 2, dark); R(lx + d, 9, 1, 1, dark) }

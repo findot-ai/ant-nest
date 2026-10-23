@@ -24,7 +24,7 @@ import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
-const VERSION = '0.14.2'
+const VERSION = '0.14.3'
 const PANE = 'ant-nest'
 // 접속 75초 = 게임 1시간, 접속 30분 = 게임 하루, 약 35시간 = 게임 1년. 한 세대(여왕 수명 5~10년)는 매일 쓰면 현실 약 3개월
 const FRAME_MS = 500, FRAMES_PER_HOUR = 150
@@ -389,6 +389,8 @@ export const register: Register = (on, options) => {
       const pw = wide ? Math.round(Math.min(820, full * 0.52)) : Math.round(Math.max(260, Math.min(900, full - 8)))
       picture = <Svg source={svg(w, ants, lang, pw, frame, (frame % FRAMES_PER_HOUR) / FRAMES_PER_HOUR)} alt={T.alt(pop)} width={pw} height={Math.round((pw * visibleRows(w)) / W)} />
     }
+    // 그림 아래 범례: 병정과 생물을 일개미와 구분해 읽게
+    if (picture && e.surface !== 'terminal') picture = <Box flexDirection="column">{picture}<Text size="caption" dimColor>{en ? `● small dark ant = worker · ◆ big ant with a large head and pale jaws = major (${majors(w)})${w.guests.length ? ' · glowing = visiting creature' : ''}` : `● 작은 검은 개미 = 일개미 · ◆ 머리가 크고 턱이 밝은 큰 개미 = 병정 (${majors(w)}마리)${w.guests.length ? ' · 빛나는 것 = 찾아온 생물' : ''}`}</Text></Box>
     // 위협 알림 띠
     const threats = w.threats.map(x => (x.k === 'centipede' ? (en ? `⚠ Centipede inside: make the failing ${x.tool} call succeed to drive it out` : `⚠ 지네 침입: 실패하던 ${x.tool}를 다시 성공시키면 물리칩니다`) : (en ? '⚠ Spider web on the trail: fix the error to cut it down' : '⚠ 길목에 거미줄: 오류를 고치면 걷어 냅니다')))
     if (w.raid) threats.push(en ? '⚔ The samurai raiders are out on a slave raid' : '⚔ 사무라이개미 습격대가 노예사냥을 나갔습니다')
