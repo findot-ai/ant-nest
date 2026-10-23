@@ -3,7 +3,7 @@ import type { Register, RenderChildren } from 'claude-code'
 
 import {
   newWorld, hourTick, moveAnts, syncAnts, sendForager, sendDigger, spawnSpider, spawnCentipede, defeatCentipede, farmFor, sendTo,
-  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid, capacity, isWinter,
+  say, workers, majors, bcount, epName, epDays, hour, airT, season, seasonName, nextGeneration, colonyLevel, queenYears, SP, slaves, raiders, armyPhase, startRaid, capacity, isWinter, prettyServer,
 } from './engine'
 import { emptyProfile, scanTranscript, scanHistory, scanSettings, pickSetup } from './profile'
 import { SPECIES, SPECIES_IDS } from './species'
@@ -11,7 +11,7 @@ import { GUESTS, RARITY_KO, RARITY_EN, guestById } from './guests'
 import type { GuestId } from './guests'
 import type { SpeciesId } from './species'
 import type { World, Ant, Tally, Lang, LogLine } from './engine'
-import { svg, raster, visibleRows } from './render'
+import { svg, raster, visibleRows, guestIcon } from './render'
 import { W } from './engine'
 import { classify, colonyType, isTestLike } from './usage'
 
@@ -304,6 +304,7 @@ export const register: Register = (on, options) => {
           {row(T.prot, `${Math.round(w.prot)}/${Math.round(cap.prot)}`, bar(w.prot, cap.prot))}
           {row(en ? 'Instinct (automation)' : '본능(자동화)', `Lv ${w.instinct.toFixed(1)}`, bar(w.instinct, 10))}
           {row(en ? 'Pheromone trail' : '페로몬 길', `${w.trail.toFixed(1)}`, bar(w.trail, 3))}
+          {w.trees.some(x => x.farm) && <Text size="caption" dimColor>{en ? 'Outside pastures (MCP)' : '바깥 목초지(MCP)'}: {w.trees.filter(x => x.farm).map(x => prettyServer(x.farm!)).join(', ')}</Text>}
         </Box>)}
         {card(T.today, <Box flexDirection="column">
           {usageRows.filter(([, v], k) => v > 0 || k < 3).map(([label, v]) => row(label, String(v), bar(v, umax, 8)))}
@@ -317,23 +318,37 @@ export const register: Register = (on, options) => {
         </Box>)}
       </Box>
     )
+    // 기록: 항목마다 칸을 나누고, 위에는 아이콘과 날짜, 아래에는 내용
+    const icon = (ko: string) => /지네|거미|두더지|토너먼트에서 밀|굶|얼어|흩어/.test(ko) ? '⚠' : /버그를 잡|고쳤|쓰러뜨/.test(ko) ? '🛡' : /손님/.test(ko) ? '🔎' : /목초지/.test(ko) ? '🌿' : /결혼비행|갈라졌|세대|대째|여왕이 죽/.test(ko) ? '👑' : /습격|노예/.test(ko) ? '⚔' : /겨울|봄|여름|가을|우기|건기|정착기|유랑기/.test(ko) ? '🍂' : /깨어났|알을|새로 팠|방을/.test(ko) ? '🐜' : /테스트|위임|에이전트|자동화|스킬|기록/.test(ko) ? '🤖' : '·'
     const history = (
-      <Box flexDirection="column" gap={0}>
-        {w.log.slice(-18).reverse().map((l, k) => (
-          <Box gap={1}><Text size="caption" dimColor mono>{(en ? `${seasonName(w, l.s, 'en').slice(0, 6)} d${l.d}` : `${seasonName(w, l.s, 'ko')} ${l.d}일`).padEnd(8)}</Text><Text size="footnote" dimColor={k > 0}>{en ? l.en : l.ko}</Text></Box>
+      <Box flexDirection="column" gap={1}>
+        {w.log.slice(-20).reverse().map((l, k) => (
+          <Box key={`log-${k}`} flexDirection="column" borderStyle="round" borderDimColor={k > 0} paddingX={1}>
+            <Text size="caption" dimColor>{icon(l.ko)}  {en ? `${seasonName(w, l.s, 'en')} · day ${l.d}` : `${seasonName(w, l.s, 'ko')} · ${l.d}일`}</Text>
+            <Text size="footnote" dimColor={k > 2}>{en ? l.en : l.ko}</Text>
+          </Box>
         ))}
       </Box>
     )
+    // 도감: 손님마다 캐릭터 카드. 못 찾은 손님은 실루엣
+    const { Svg: DexSvg } = e.surface === 'terminal' ? { Svg: null } : $.ui.resolve(e as typeof e & { surface: 'desktop' })
     const dex = (
-      <Box flexDirection="column">
-        <Text size="footnote" dimColor>{en ? `Found ${Object.keys(w.dex).length} of ${GUESTS.length}. Guests now visiting: ` : `${GUESTS.length}종 중 ${Object.keys(w.dex).length}종 발견. 지금 방문 중: `}{w.guests.length ? w.guests.map(g => (en ? guestById(g.id).en : guestById(g.id).ko)).join(', ') : (en ? 'none' : '없음')}</Text>
-        {GUESTS.map(g => {
-          const d = w.dex[g.id], r = en ? RARITY_EN[g.rarity] : RARITY_KO[g.rarity], stars = '★'.repeat(g.rarity) + '☆'.repeat(4 - g.rarity)
-          const host = g.hosts === 'all' ? (en ? 'any species' : '모든 종') : g.hosts.map(spName).join(', ')
-          return d
-            ? <Box flexDirection="column" marginTop={1}><Text size="footnote" weight="semibold">✔ {en ? g.en : g.ko} <Text dimColor>{stars} {r} · ×{d.n}</Text></Text><Text size="caption" dimColor>{en ? g.enDesc : g.koDesc}</Text></Box>
-            : <Box marginTop={1}><Text size="footnote" dimColor>？ ???? {stars} {r} · {en ? 'lives with' : '사는 곳'}: {host}</Text></Box>
-        })}
+      <Box flexDirection="column" gap={1}>
+        <Text size="footnote" dimColor>{en ? `Found ${Object.keys(w.dex).length} of ${GUESTS.length}. Visiting now: ` : `${GUESTS.length}종 중 ${Object.keys(w.dex).length}종 발견 · 지금 방문 중: `}{w.guests.length ? w.guests.map(g => (en ? guestById(g.id).en : guestById(g.id).ko)).join(', ') : (en ? 'none' : '없음')}</Text>
+        <Box flexDirection="row" flexWrap="wrap" gap={1}>
+          {GUESTS.map(g => {
+            const d = w.dex[g.id], r = en ? RARITY_EN[g.rarity] : RARITY_KO[g.rarity], stars = '★'.repeat(g.rarity) + '☆'.repeat(4 - g.rarity)
+            const host = g.hosts === 'all' ? (en ? 'any species' : '모든 종') : g.hosts.map(spName).join(', ')
+            return (
+              <Box key={`dex-${g.id}`} flexDirection="column" borderStyle="round" borderColor={d && g.rarity === 4 ? 'warning' : undefined} borderDimColor={!d} paddingX={1} width={30}>
+                {DexSvg && <DexSvg source={guestIcon(g.id, !!d)} alt={d ? (en ? g.en : g.ko) : '?'} width={80} height={50} />}
+                <Text size="footnote" weight="semibold" dimColor={!d}>{d ? (en ? g.en : g.ko) : '？？？？'}</Text>
+                <Text size="caption" color={g.rarity >= 3 ? 'warning' : undefined} dimColor={g.rarity < 3}>{stars} {r}{d ? ` · ×${d.n}` : ''}</Text>
+                <Text size="caption" dimColor>{d ? (en ? g.enDesc : g.koDesc) : `${en ? 'Lives with' : '사는 곳'}: ${host}`}</Text>
+              </Box>
+            )
+          })}
+        </Box>
       </Box>
     )
     const lineage = (

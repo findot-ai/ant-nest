@@ -21,7 +21,7 @@ export type RoomType = 'queen' | 'brood' | 'store' | 'waste'
 export type Chamber = { id: number; cx: number; cy: number; rx: number; ry: number; type: RoomType }
 export type Brood = { st: Stage; n: number; dev: number; prot: number; room: number; slave?: boolean }
 export type Cohort = { age: number; n: number; kind: 'w' | 'm' | 's' }   // s = 훔쳐 온 노예 일개미(사무라이개미)
-export type Ant = { x: number; y: number; kind: 'w' | 'm' | 's'; job: 'idle' | 'forage' | 'dig' | 'guard' | 'swarm'; st: 'in' | 'out'; tx: number; carry: 0 | 1 | 2; t: number; climb: number; up: number; f?: number }
+export type Ant = { x: number; y: number; kind: 'w' | 'm' | 's'; job: 'idle' | 'forage' | 'dig' | 'guard' | 'swarm' | 'haul'; st: 'in' | 'out'; tx: number; carry: 0 | 1 | 2 | 3; t: number; climb: number; up: number; f?: number; gx?: number; gy?: number }
 export type Threat = { k: 'spider' | 'centipede'; x: number; y: number; hp: number; hp0: number; life: number; tool?: string; trail: [number, number][]; alarmR: number; ate: number }
 export type Lineage = { gen: number; species: SpeciesId; years: number; peak: number; fixed: number; ended: 'succession' | 'collapse' }
 export type Origin = { stage: Stage0; ko: string; en: string }
@@ -31,7 +31,7 @@ export type LogLine = { s: number; d: number; ko: string; en: string }
 export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number }
 
 export type World = {
-  v: 4; over?: boolean; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
+  v: 4; over?: boolean; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
   queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number }[]
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
@@ -414,7 +414,9 @@ export function step(w: World, a: { x: number; y: number }, tx: number, ty: numb
 }
 
 export function syncAnts(w: World, ants: Ant[]) {
-  const tw = Math.min(70, Math.round(raiders(w) / 4)), tm = Math.min(12, Math.round(majors(w) / 2)), ts = Math.min(60, Math.round(slaves(w) / 4))
+  // 작은 군락은 전부, 큰 군락은 점점 줄여 그린다
+  const vis = (n: number, cap: number) => Math.min(cap, Math.round(n <= 50 ? n : 50 + (n - 50) / 6))
+  const tw = vis(raiders(w), 90), tm = vis(majors(w), 16), ts = vis(slaves(w), 80)
   const cnt = { w: ants.filter(a => a.kind === 'w').length, m: ants.filter(a => a.kind === 'm').length, s: ants.filter(a => a.kind === 's').length }
   const q = w.chambers[w.queen.room]!
   while (cnt.w < tw) { ants.push({ x: q.cx, y: q.cy, kind: 'w', job: 'idle', st: 'in', tx: 0, carry: 0, t: 0, climb: 0, up: 0 }); cnt.w++ }
@@ -437,6 +439,9 @@ export function sendDigger(w: World, ants: Ant[]) {
 export function moveAnts(w: World, ants: Ant[]) {
   const s = season(w), cen = w.threats.find(t => t.k === 'centipede'), spider = w.threats.find(t => t.k === 'spider')
   const ex = entranceX(w), qr = w.chambers[w.queen.room]!
+  // 돌아다닐 목적지 후보: 굴 칸 전체 (한 번만 모은다)
+  const tunnels: number[] = []; for (let i = SURF * W; i < W * H; i++) if (w.grid[i] === TUN) tunnels.push(i)
+  const canWork = !isWinter(w) && w.rain <= 0 && isDay(w), worker = SP(w).dulotic ? 's' : 'w'
   for (const a of ants) {
     const ox = a.x
     moveOne(a)
@@ -444,6 +449,13 @@ export function moveAnts(w: World, ants: Ant[]) {
   }
   function moveOne(a: Ant) {
     if (a.st === 'out') {
+      // 흙 나르기: 굴에서 판 흙을 입구 밖 흙무더기에 버린다
+      if (a.job === 'haul') {
+        if (a.carry) { if (a.x !== a.tx) a.x += Math.sign(a.tx - a.x); else { a.carry = 0; w.mound = Math.min(30, (w.mound ?? 0) + 0.15) } }
+        else if (a.x !== ex) a.x += Math.sign(ex - a.x)
+        else { a.st = 'in'; a.y = SURF; a.job = 'idle' }
+        return
+      }
       // 나무에 오르내리기: up이 지금 높이, climb이 진딧물이 있는 높이
       if (!a.carry && a.x === a.tx) { if (a.up < a.climb) { a.up++; return } a.carry = a.t as 1 | 2; return }
       if (a.carry && a.up > 0) { a.up--; return }
@@ -458,10 +470,21 @@ export function moveAnts(w: World, ants: Ant[]) {
     if (cen && (a.kind === 'm' || Math.abs(a.x - cen.x) + Math.abs(a.y - cen.y) <= cen.alarmR)) { a.job = 'swarm'; step(w, a, cen.x, cen.y, 0.97); return }
     if (a.job === 'swarm') a.job = a.kind === 'm' ? 'guard' : 'idle'
     if (a.job === 'forage') { if (a.y <= SURF) { a.st = 'out'; a.y = SURF - 1 } else step(w, a, ex, SURF, 0.9); return }
-    if (a.job === 'dig') { const t = w.tips[0]; if (t) step(w, a, t.x, t.y, 0.8); if (--a.t <= 0) a.job = 'idle'; return }
+    if (a.job === 'dig') { const t = w.tips[(a.x + a.y) % Math.max(1, w.tips.length)]; if (t) step(w, a, t.x, t.y, 0.85); if (--a.t <= 0) { a.job = 'haul'; a.carry = 3 } return }
+    if (a.job === 'haul') { if (a.y <= SURF) { a.st = 'out'; a.y = SURF - 1; a.tx = Math.max(1, Math.min(W - 2, ex + (rnd() < 0.5 ? -1 : 1) * (2 + Math.floor(rnd() * 3)))) } else step(w, a, ex, SURF, 0.9); return }
     if (a.job === 'guard') { step(w, a, ex + Math.round((rnd() - 0.5) * 3), SURF + 3, 0.6); return }
-    const rooms = w.chambers.filter(c => c.type !== 'waste'), r = rooms[(a.x * 7 + a.y) % rooms.length]!
-    step(w, a, r.cx + Math.round((rnd() - 0.5) * r.rx * 2), r.cy, rnd() < 0.5 ? 0.6 : 0.1)
+    // 본능대로 일하기: 낮에는 알아서 채집을 나가고, 굴을 파서 흙을 밖으로 나른다
+    if (a.kind === worker && canWork) {
+      const r = rnd()
+      if (r < 0.006) { const tree = w.trees[Math.floor(rnd() * w.trees.length)]!, prot = rnd() < 0.2; a.job = 'forage'; a.carry = 0; a.t = prot ? 2 : 1; a.tx = prot ? 3 + Math.floor(rnd() * (W - 6)) : tree.x; a.climb = prot ? 0 : Math.max(0, tree.h - 2); a.up = 0; return }
+      if (r < 0.01 && w.tips.length) { a.job = 'dig'; a.t = 14 + Math.floor(rnd() * 10); return }
+    }
+    // 그 밖에는 굴 곳곳을 돌아다닌다: 목적지에 닿거나 가끔 새 목적지를 고른다
+    if (a.gx === undefined || (a.x === a.gx && a.y === a.gy) || rnd() < 0.015) {
+      if (rnd() < 0.55 && w.chambers.length) { const c = w.chambers[Math.floor(rnd() * w.chambers.length)]!; a.gx = c.cx + Math.round((rnd() - 0.5) * c.rx * 2); a.gy = c.cy }
+      else if (tunnels.length) { const i = tunnels[Math.floor(rnd() * tunnels.length)]!; a.gx = i % W; a.gy = Math.floor(i / W) }
+    }
+    step(w, a, a.gx ?? qr.cx, a.gy ?? qr.cy, 0.75)
   }
 }
 

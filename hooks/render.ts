@@ -1,4 +1,4 @@
-import { W, H, SURF, CM, SKY, SOIL, TUN, ROCK, ROOMNAME, ROOMNAME_EN, SP, prettyServer, idx, layerOf, season, hour, chamberAt, frostDepth } from './engine'
+import { W, H, SURF, CM, SKY, SOIL, TUN, ROCK, ROOMNAME, ROOMNAME_EN, SP, idx, layerOf, season, hour, chamberAt, frostDepth } from './engine'
 import type { World, Ant, Lang } from './engine'
 
 const SOILC = ['#563a26', '#a47646', '#805e44', '#625852']
@@ -194,7 +194,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
       const x = a.x * S + (i % 2 ? 4 : -2), y = GY - 6 - a.up * S
       P.rect(L_ANT, x + 1, y, 2, 2, body); P.rect(L_ANT, x + 1, y + 2, 2, 1, body); P.rect(L_ANT, x, y + 3, 4, 3, body)
       P.rect(L_ANT, x - 1, y + 1 + flip, 1, 1, body); P.rect(L_ANT, x + 4, y + 2 - flip, 1, 1, body)
-      if (a.carry) P.rect(L_FX, x + 1, y - 2, 2, 2, a.carry === 2 ? '#c9472f' : leaf)
+      if (a.carry) P.rect(L_FX, x + 1, y - 2, 2, 2, a.carry === 3 ? '#7a5a3a' : a.carry === 2 ? '#c9472f' : leaf)
       continue
     }
     const y = out ? GY - 6 : a.y * S + 1, x = a.x * S
@@ -205,7 +205,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
     P.rect(L_ANT, f > 0 ? hd + (big ? 3 : 2) : hd - 1, y - 1, 1, 1, body)
     for (let k = 0; k < 3; k++) P.rect(L_ANT, x + 1 + k * 2 + ((k + flip) % 2), y + 4, 1, 1, body)
     if (a.job === 'swarm') P.rect(L_FX, hd, y - 2, 2, 1, '#ff5a3c')
-    if (a.carry) P.rect(L_FX, f > 0 ? hd + 1 : hd - 2, y - 2, sp.carry ? 4 : 3, sp.carry ? 3 : 2, a.carry === 2 ? '#c9472f' : leaf)
+    if (a.carry) P.rect(L_FX, f > 0 ? hd + 1 : hd - 2, y - 2, sp.carry ? 4 : 3, sp.carry ? 3 : 2, a.carry === 3 ? '#7a5a3a' : a.carry === 2 ? '#c9472f' : leaf)
   }
   // 여왕: 크고 날개 자국이 있다
   const q = w.chambers[w.queen.room]!, qx = q.cx * S - 6, qy = (q.cy + q.ry) * S - 3
@@ -233,6 +233,10 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
       P.rect(L_TXT, t.x * S - 4, t.y * S - 7, 14, 3, '#2a1a12'); P.rect(L_TXT, t.x * S - 4, t.y * S - 7, Math.max(1, Math.round((14 * t.hp) / t.hp0)), 3, '#de6a4c')
     }
   }
+  // 입구 밖 흙무더기: 일개미가 굴에서 파낸 흙을 버린 자리
+  { const m = Math.round(w.mound ?? 0), ex = w.grid.findIndex((g, i) => i >= SURF * W && i < (SURF + 1) * W && g === TUN) - SURF * W
+    for (let r = 0; r < Math.min(6, 1 + Math.floor(m / 4)); r++) { const half = 3 + m / 2 - r * 2; if (half <= 0) break
+      for (const side of [-1, 1]) P.rect(L_ITEM, (ex + 0.5) * S + side * (S + 2) + (side < 0 ? -half * 2 : 0), GY - 2 - r * 2, half * 2, 2, r % 2 ? '#8a6640' : '#7a5a3a') } }
   // 군대개미 비박: 일개미 몸이 엉겨 붙은 살아 있는 둥지
   if (sp.bivouac) { const c = w.chambers[w.queen.room]!; for (let k = 0; k < 90; k++) { const ax = (c.cx - c.rx) * S + hash(k, 31) * (c.rx * 2 + 1) * S, ay = (c.cy - c.ry) * S + hash(k, 32) * (c.ry * 2 + 1) * S; P.rect(L_ITEM, ax, ay, 3, 2, k % 5 ? sp.body : sp.major) } }
   // 사무라이개미 노예사냥 행렬: 나갈 때는 빈 턱, 돌아올 때는 곰개미 번데기를 물고
@@ -278,7 +282,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
   }
   label(sp.bivouac ? (lang === 'en' ? 'Bivouac (living nest)' : '비박 (살아 있는 둥지)') : lang === 'en' ? 'Queen' : '여왕', q.cx * S + 3, (q.cy - q.ry) * S - 2, '#1a120a', '#e3a33b')
   for (const c of w.chambers) if (c.type !== 'queen') label(RN[c.type], c.cx * S + 3, (c.cy - c.ry) * S - 2, '#efe4d2', 'rgba(20,14,10,.72)')
-  w.trees.filter(t => t.farm).forEach((t, k) => label(prettyServer(t.farm!), t.x * S, GY + 10 + (k % 2) * 11, '#eaf5df', 'rgba(30,60,30,.8)'))
+  // 목초지 이름은 그림 위에 쓰지 않는다 (대시보드에서 보여 준다)
   if (fd > 0) label(`${lang === 'en' ? 'Frost line' : '동결선'} ${fd}cm`, WW - 40, GY + (fd / CM) * S - 2, '#0b1a2a', 'rgba(220,240,255,.9)')
   // 깊이 눈금
   const VR = visibleRows(w)
@@ -301,4 +305,22 @@ export function raster(w: World, ants: Ant[]) {
   }
   const bytes = new Uint8Array(words.buffer) as Uint8Array & { toBase64: () => string }
   return { cells: bytes.toBase64(), columns: W, rows }
+}
+
+// ---------- 도감 카드용 손님 캐릭터 (16×10 칸 도트, 못 찾은 손님은 검은 실루엣) ----------
+const SPRITES: Record<string, [number, number, number, number, string][]> = {
+  cricket: [[2, 4, 9, 4, '#8a6a42'], [3, 4, 7, 1, '#a88658'], [11, 3, 2, 2, '#6e5232'], [13, 1, 1, 2, '#6e5232'], [14, 0, 2, 1, '#6e5232'], [1, 8, 2, 1, '#6e5232'], [5, 8, 1, 2, '#6e5232'], [8, 8, 1, 2, '#6e5232'], [0, 6, 2, 1, '#5a4228']],
+  rove: [[2, 4, 11, 3, '#1c1410'], [3, 4, 4, 1, '#6a3a1c'], [13, 4, 2, 2, '#1c1410'], [15, 3, 1, 1, '#1c1410'], [4, 7, 1, 2, '#1c1410'], [8, 7, 1, 2, '#1c1410'], [11, 7, 1, 2, '#1c1410']],
+  lycaenid: [[3, 4, 10, 4, '#9bc46a'], [4, 3, 8, 1, '#b6d88a'], [4, 4, 8, 1, '#c4e29a'], [12, 5, 2, 2, '#7aa04a'], [5, 8, 1, 1, '#6a8a3a'], [8, 8, 1, 1, '#6a8a3a'], [11, 8, 1, 1, '#6a8a3a']],
+  niphanda: [[3, 4, 10, 4, '#d8c8a8'], [4, 3, 8, 1, '#efe4cc'], [12, 5, 2, 2, '#b8a888'], [2, 1, 12, 1, '#ffd75a'], [5, 8, 1, 1, '#a89878'], [9, 8, 1, 1, '#a89878']],
+  attaphila: [[5, 5, 6, 3, '#c49a5a'], [6, 4, 4, 1, '#d8b47a'], [11, 6, 1, 1, '#a07a3a'], [12, 5, 2, 1, '#a07a3a'], [5, 8, 1, 1, '#8a6a3a'], [9, 8, 1, 1, '#8a6a3a']],
+  antbird: [[3, 3, 8, 5, '#3a3a3a'], [10, 1, 4, 4, '#1e1e1e'], [14, 2, 2, 1, '#d8d0a0'], [11, 2, 1, 1, '#f0f0f0'], [0, 4, 4, 2, '#2a2a2a'], [5, 4, 4, 2, '#545454'], [6, 8, 1, 2, '#8a7a5a'], [9, 8, 1, 2, '#8a7a5a']],
+  silverfish: [[2, 5, 10, 2, '#b8c0c8'], [3, 4, 8, 1, '#d4dae0'], [12, 5, 2, 1, '#8a9298'], [14, 4, 2, 1, '#8a9298'], [0, 6, 2, 1, '#8a9298'], [0, 4, 2, 1, '#8a9298']],
+  gynandro: [[1, 4, 5, 4, '#140c08'], [6, 5, 3, 2, '#140c08'], [9, 4, 3, 3, '#b84a1e'], [12, 3, 3, 3, '#b84a1e'], [14, 1, 1, 2, '#b84a1e'], [2, 8, 1, 2, '#140c08'], [6, 8, 1, 2, '#140c08'], [10, 8, 1, 2, '#b84a1e'], [0, 0, 16, 1, '#ffd75a']],
+}
+export function guestIcon(id: string, found: boolean, px = 5) {
+  const parts = (SPRITES[id] ?? []).filter(([, , , , c]) => found || c !== '#ffd75a')
+    .map(([x, y, w, h, c]) => `<rect x="${x * px}" y="${y * px}" width="${w * px}" height="${h * px}" fill="${found ? c : '#2a2622'}"/>`).join('')
+  const W2 = 16 * px, H2 = 10 * px
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W2} ${H2}" width="${W2}" height="${H2}" shape-rendering="crispEdges"><rect width="${W2}" height="${H2}" rx="6" fill="${found ? '#efe4d2' : '#cfc6ba'}"/>${parts}</svg>`
 }
