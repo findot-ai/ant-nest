@@ -64,7 +64,7 @@ test('the band above the prompt and every command answer', async ($, on) => {
     expect((await ui.find({ type: 'Text', text: /🐜/ }))?.text).toContain('🐜')
     await ui.unmount()
   }
-  for (const args of ['', 'stats', 'dex', 'report', 'report last', 'species', 'gift', 'card', 'new atta', 'off', 'stats', 'on', 'reset']) {
+  for (const args of ['', 'stats', 'dex', 'report', 'report last', 'species', 'gift', 'card', 'new atta', 'off', 'stats', 'on', 'hide', 'show', 'version', 'reset']) {
     const r = await $.command.run({ command: 'ant', args } as never)
     expect(JSON.stringify(r).length).toBeGreaterThan(10)
   }

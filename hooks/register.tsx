@@ -17,6 +17,7 @@ import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
+const VERSION = '0.12.0'
 const PANE = 'ant-nest'
 // 접속 75초 = 게임 1시간, 접속 30분 = 게임 하루, 약 35시간 = 게임 1년. 한 세대(여왕 수명 5~10년)는 매일 쓰면 현실 약 3개월
 const FRAME_MS = 500, FRAMES_PER_HOUR = 150
@@ -74,7 +75,8 @@ export const register: Register = (on, options) => {
   const me = Math.random().toString(36).slice(2, 10)
   let leader = false, pending: Ev[] = [], syncs = 0
   // 프로젝트별로 끌 수 있다: 꺼진 폴더에서는 창·상태줄을 띄우지 않고 활동도 세지 않는다
-  let muted = false, cwd = ''
+  let muted = false, hidden = false, cwd = ''
+  const quiet = () => muted || hidden   // 숨김: 화면만 안 띄우고 활동은 계속 센다
 
   const bump = (k: keyof Tally) => { w.today[k]++; w.total[k]++; w.week ??= emptyTally(); w.week[k] = (w.week[k] ?? 0) + 1 }
   const gain = (n: number) => { const g = Math.max(0, Math.min(n, 8 - hourGain)); hourGain += g; return g }
@@ -153,6 +155,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     cwd = e.cwd
     muted = (((await $.store.get('off')) as string[] | undefined) ?? []).includes(cwd)
+    hidden = (((await $.store.get('hide')) as string[] | undefined) ?? []).includes(cwd)
     const saved = (await $.store.get('world')) as World | undefined
     if (saved && saved.v === 4 && Array.isArray(saved.grid)) { w = saved; w.guests ??= []; w.dex ??= {}; w.newDex ??= []; w.lineage ??= []; say(w, '다시 접속했다. 개미들이 하던 일을 이어 간다.', 'You are back. The ants pick up where they left off.') }
     else {
@@ -196,8 +199,8 @@ export const register: Register = (on, options) => {
       if (!muted && (!L || Date.now() - L.ts > 30000)) { leader = true; await $.store.set('leader', { id: me, ts: Date.now() }); await $.store.set('world', w) } }
     // 사람 없이 돌아가는 세션(-p, SDK, 예약 실행)은 자동화다
     if (!e.isInteractive) { w.instinct = Math.min(10, w.instinct + 0.5); bump('auto') }
-    await $.command.register({ name: 'ant', description: '개미굴 / Ant nest — on · off(이 프로젝트만 끄기) · report · stats · dex(생물 도감) · species · new <종> · gift · adopt <code> · card · reset' })
-    if (!muted) { const opened = await $.ui.open({ id: PANE, title: T.title }); paneNote = opened.isPlaced ? 'placed' : opened.reason }
+    await $.command.register({ name: 'ant', description: '개미굴 / Ant nest — hide·show(이 프로젝트 화면만 숨기기) · off·on(이 프로젝트 끄기) · report · stats · dex · species · new <종> · gift · adopt · card · version · reset' })
+    if (!quiet()) { const opened = await $.ui.open({ id: PANE, title: T.title }); paneNote = opened.isPlaced ? 'placed' : opened.reason }
     $.clock.every(FRAME_MS, () => {
       frame++
       moveAnts(w, ants)
@@ -232,14 +235,14 @@ export const register: Register = (on, options) => {
         if (w.over) { const succ = w.alates > 0; w = nextGeneration(w); ants = []; syncAnts(w, ants); $.ui.toast(succ ? T.succession : T.collapse); void $.store.set('world', w) }
         if (w.tick % 24 === 0) syncAnts(w, ants)
       }
-      const st = statusText(); if (st && !muted) $.ui.status(st)
+      const st = statusText(); if (st && !quiet()) $.ui.status(st)
       void update($, view, () => ({ frame }))
     })
     return next(e)
   })
 
   on('session.attach', async ($, e, next) => {
-    if (muted) return next(e)
+    if (quiet()) return next(e)
     const opened = await $.ui.open({ id: PANE, title: T.title })
     paneNote = opened.isPlaced ? `placed (${e.surface})` : `${e.surface}: ${opened.reason}`
     return next(e)
@@ -247,7 +250,7 @@ export const register: Register = (on, options) => {
 
   // 창을 둘 수 없는 화면에서도 보이도록 입력창 위에 한 줄
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (muted) return next(e)
+    if (quiet()) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
     await read($, view)
     const pop = Math.round(workers(w) + majors(w)), t = w.today
@@ -278,6 +281,18 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'ant' }, async ($, e) => {
     const arg = e.args.trim(), en = lang === 'en'
+    if (arg === 'hide' || arg === 'show') {
+      const list = ((await $.store.get('hide')) as string[] | undefined) ?? []
+      if (arg === 'hide') {
+        if (!list.includes(cwd)) await $.store.set('hide', [...list, cwd])
+        hidden = true; await $.ui.close({ id: PANE }); $.ui.status(undefined); lastStatus = ''
+        return { text: en ? 'The nest is hidden in this project, but your work here still counts. /ant show brings it back.' : '이 프로젝트에서는 개미굴 화면을 숨겼습니다. 여기서 한 작업은 계속 반영됩니다. 다시 보려면 /ant show' }
+      }
+      await $.store.set('hide', list.filter(x => x !== cwd)); hidden = false
+      await $.ui.open({ id: PANE, title: T.title, focus: true })
+      return { text: en ? 'The nest is shown again in this project.' : '이 프로젝트에서 개미굴 화면을 다시 띄웠습니다.' }
+    }
+    if (arg === 'version') return { text: `ant-nest ${VERSION} · ${leader ? (en ? 'this window runs the colony' : '이 창이 군락을 돌리는 중') : (en ? 'this window follows the colony' : '다른 창이 돌리는 군락을 따라 보는 중')}${muted ? (en ? ' · off here' : ' · 이 프로젝트에서 꺼짐') : hidden ? (en ? ' · hidden here' : ' · 이 프로젝트에서 숨김') : ''}` }
     if (arg === 'off' || arg === 'on') {
       const off = ((await $.store.get('off')) as string[] | undefined) ?? []
       if (arg === 'off') {
@@ -329,7 +344,7 @@ export const register: Register = (on, options) => {
       w = newWorld({ species: id || w.species, stage: 'found', farms: w.trees.filter(t => t.farm).map(t => t.farm!), trail: 0, instinct: 0, majorBias: 0, storeBias: 0, ko: '', en: '' }, 1, w.lineage); ants = []; syncAnts(w, ants); await $.store.set('world', w); return { text: T.reset }
     }
     if (arg === 'reset') { await $.store.delete('world'); w = newWorld(); ants = []; syncAnts(w, ants); await $.store.set('world', w); await $.ui.open({ id: PANE, title: T.title }); return { text: T.reset } }
-    if (arg === 'stats') return { text: `${badge()}\n${T.stats(w.total, Math.round(workers(w) + majors(w)), epName(w.ep, lang, w))}\n${T.type}: ${colonyType(w.total, lang)}\n${T.learned(Object.keys(w.learned).length)}\n${T.origin}: ${lang === 'en' ? w.origin.en : w.origin.ko}${w.lineage.length ? `\n${T.lineage}: ` + w.lineage.map(l => `${T.gen(l.gen)} ${spName(l.species)} ${l.years}y · peak ${l.peak}`).join(' / ') : ''}` }
+    if (arg === 'stats') return { text: `ant-nest ${VERSION}\n${badge()}\n${T.stats(w.total, Math.round(workers(w) + majors(w)), epName(w.ep, lang, w))}\n${T.type}: ${colonyType(w.total, lang)}\n${T.learned(Object.keys(w.learned).length)}\n${T.origin}: ${lang === 'en' ? w.origin.en : w.origin.ko}${w.lineage.length ? `\n${T.lineage}: ` + w.lineage.map(l => `${T.gen(l.gen)} ${spName(l.species)} ${l.years}y · peak ${l.peak}`).join(' / ') : ''}` }
     const opened = await $.ui.open({ id: PANE, title: T.title, focus: true })
     paneNote = opened.isPlaced ? 'placed' : opened.reason
     const surfaces = (await $.session.surfaces()).join(', ') || T.none
@@ -344,7 +359,7 @@ export const register: Register = (on, options) => {
     // 넘기는 것은 도구 이름과 분류 결과뿐이다 (명령·내용은 남기지 않음)
     const ev: Ev = { tool: e.tool, failed: ran.isError === true, testFail: isTestLike(cmd), use: classify(e.tool, input), mcpTool: /^mcp__[^_]+(?:_[^_]+)*?__(.*)$/.exec(e.tool)?.[1] ?? '' }
     if (leader) { const t = applyEvent(ev); if (t) $.ui.toast(t) } else pending.push(ev)
-    const st = statusText(); if (st) $.ui.status(st)
+    const st = statusText(); if (st && !hidden) $.ui.status(st)
     return ran
   }).catch(($, e, next) => next(e))
 

@@ -104,6 +104,8 @@ Run `/ant stats`, take a screenshot, and post it with the [Show your colony](htt
 
 - `/ant`: open the nest pane
 - `/ant stats`: your usage so far, colony type, tools learned
+- `/ant hide` · `/ant show`: hide the nest in the current project while your work there still counts. Handy with several windows open: keep it visible in one
+- `/ant version`: which version this window runs, and whether it runs the colony or follows it
 - `/ant off` · `/ant on`: turn the nest off (or back on) for the current project only. Off means no pane, no status line, and work there doesn't count
 - `/ant report` · `/ant report last`: your AI use report for this week, or last week's
 - `/ant dex`: the creature dex
@@ -239,6 +241,8 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 - `/ant`: 개미굴 창 열기
 - `/ant stats`: 지금까지의 활용, 군락 유형, 배운 도구
+- `/ant hide` · `/ant show`: 지금 프로젝트에서 화면만 숨기기. 작업은 계속 반영됨. 창을 여러 개 열 때 한 곳에만 띄워 두기 좋음
+- `/ant version`: 이 창의 버전과, 이 창이 군락을 돌리는지 따라 보는지
 - `/ant off` · `/ant on`: 지금 프로젝트에서만 개미굴 끄기·켜기. 끄면 창과 상태줄이 뜨지 않고 그 프로젝트의 작업은 반영되지 않음
 - `/ant report` · `/ant report last`: 이번 주 AI 활용 리포트, 지난주 리포트
 - `/ant dex`: 생물 도감
