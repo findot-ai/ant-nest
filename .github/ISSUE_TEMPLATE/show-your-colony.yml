@@ -1,0 +1,47 @@
+name: "🐜 Show your colony · 내 군락 자랑하기"
+description: "Post your ant colony to the Colony Hall · 군락 명예의 전당에 내 군락을 올리기"
+title: "[Colony] "
+labels: ["colony-hall"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Run `/ant stats` in Claude Code and paste the result below, with a screenshot of your nest.
+        Claude Code에서 `/ant stats`를 실행해 결과를 붙여 넣고, 개미굴 스크린샷을 올려 주세요.
+  - type: input
+    id: colony
+    attributes:
+      label: "Colony name · 군락 이름"
+      placeholder: "e.g. Midnight Diggers · 예: 야근 굴착대"
+    validations:
+      required: true
+  - type: textarea
+    id: stats
+    attributes:
+      label: "/ant stats output · 결과"
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: type
+    attributes:
+      label: "Colony type · 군락 유형"
+      options:
+        - "Scout · 정찰형"
+        - "Builder · 건축형"
+        - "Hunter · 사냥형"
+        - "Delegator · 분업형"
+        - "Herder · 목축형"
+        - "Trailblazer · 길잡이형"
+        - "Instinct · 본능형"
+        - "Still forming · 형성 중"
+  - type: textarea
+    id: shot
+    attributes:
+      label: "Screenshot · 스크린샷"
+      description: "Drag an image here · 이미지를 끌어다 놓으세요"
+  - type: textarea
+    id: story
+    attributes:
+      label: "Best moment · 가장 기억에 남는 순간"
+      placeholder: "The centipede that ate half my nursery before I fixed the build… · 빌드를 고치기 전에 육아방 절반을 먹어 치운 지네…"

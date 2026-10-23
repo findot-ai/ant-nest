@@ -1,8 +1,20 @@
-# Ant Nest · 개미굴
+# 🐜 Ant Nest · 개미굴 — a Claude Code plugin that turns your AI coding into an ant colony
 
-**English** · [한국어](#한국어)
+**A pixel-art ant colony simulation that lives beside Claude Code and grows with how you use AI.** Explore and your foragers bring food home. Edit and they dig. Pass tests and they hunt. Hit the same bug three times and a centipede breaks in. Fix it and the colony eats well.
 
-A colony of Japanese carpenter ants (*Camponotus japonicus*) lives beside your Claude Code session. While you are connected, 2 seconds is one game hour: seasons turn, brood grows with soil temperature, and the frost line creeps down in winter.
+**Claude Code 옆에서 살아 움직이는 도트 개미 군락 시뮬레이션. 내 AI 활용이 군락의 먹이이자 날씨가 됩니다.**
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) ![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757) ![Languages](https://img.shields.io/badge/lang-English%20%7C%20한국어-blue)
+
+<p align="center"><img src="docs/nest-en.png" width="360" alt="Ant Nest: pixel-art cross-section of an ant colony with a centipede intrusion and a spider web"></p>
+
+```
+/plugin install ant-nest --marketplace findot-ai/ant-nest
+```
+
+**English** · [한국어](#한국어) · [Show your colony](https://github.com/findot-ai/ant-nest/issues/new?template=show-your-colony.yml)
+
+A colony of Japanese carpenter ants (*Camponotus japonicus*) lives beside your Claude Code session. While you are connected, 2 seconds is one game hour: seasons turn, brood grows with soil temperature, and the frost line creeps down in winter. Think of it as a Tamagotchi for your AI workflow, built on real ant ecology.
 
 The colony's food and weather come from how you use AI. The mod never reads your code or conversation. It looks only at tool names and whether each call succeeded.
 
@@ -29,6 +41,10 @@ The colony's food and weather come from how you use AI. The mod never reads your
 Over time your usage pattern gives the colony a type: Scout, Builder, Hunter, Delegator, Herder (MCP-heavy), Trailblazer (skill-heavy) or Instinct (automation-heavy).
 
 The colony never dies from your work. The queen can weaken, but idle days are just quiet days.
+
+## Show your colony
+
+Run `/ant stats`, take a screenshot, and post it with the [Show your colony](https://github.com/findot-ai/ant-nest/issues/new?template=show-your-colony.yml) form. Colonies appear in the Colony Hall (issues labeled `colony-hall`).
 
 ## Commands
 
@@ -62,6 +78,8 @@ The desktop app draws the nest as pixel art in a side pane. A terminal draws it 
 
 ## 한국어
 
+<p align="center"><img src="docs/nest-ko.png" width="360" alt="개미굴: 지네가 침입하고 거미줄이 쳐진 개미 군락 단면 도트 그림"></p>
+
 Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 접속해 있는 동안 2초가 게임 1시간이고, 계절이 바뀌고, 새끼가 땅속 온도에 따라 자라고, 겨울에는 동결선이 내려옵니다.
 
 군락의 먹이와 날씨는 당신의 AI 활용입니다. 코드나 대화 내용은 읽지 않고, 도구 이름과 성공 여부만 봅니다.
@@ -90,6 +108,10 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 접속�
 
 일 때문에 군락이 전멸하지는 않습니다. 여왕은 약해질 수 있지만, 쉬는 날은 조용히 지나갈 뿐입니다.
 
+## 내 군락 자랑하기
+
+`/ant stats` 결과와 스크린샷을 [내 군락 자랑하기](https://github.com/findot-ai/ant-nest/issues/new?template=show-your-colony.yml) 양식으로 올려 주세요. `colony-hall` 라벨이 붙은 이슈가 군락 명예의 전당이 됩니다.
+
 ## 명령
 
 - `/ant`: 개미굴 창 열기
@@ -117,3 +139,7 @@ claude plugin install ant-nest --marketplace findot-ai/ant-nest
 데스크톱 앱에서는 입력창 옆 + → Plugins → Add marketplace에 `findot-ai/ant-nest`를 넣고 Add plugin을 누릅니다.
 
 데스크톱 앱에서는 옆 창에 도트 그림으로, 터미널에서는 반 블록 문자로 그립니다. 터미널 폭이 좁으면 창이 자동으로 뜨지 않으니 `/ant`로 여세요.
+
+---
+
+**Keywords:** Claude Code plugin, Claude Code mod, AI coding companion, developer Tamagotchi, gamification for developers, pixel art, ant colony simulation, ant farm, MCP, Claude Agent · 클로드 코드 플러그인, 개미 키우기, 개미 시뮬레이션, 개발자 게임
