@@ -271,7 +271,7 @@ export function svg(w: World, ants: Ant[], lang: Lang = 'ko', width = 288) {
     boxes.push([x, y - 8, wdt, 10])
     P.raw(L_TXT, `<rect x="${x.toFixed(1)}" y="${y - 8}" width="${wdt.toFixed(1)}" height="10" rx="2" fill="${bg}"/><text x="${(x + wdt / 2).toFixed(1)}" y="${y}" font-size="7.5" text-anchor="middle" fill="${fg}">${text.replace(/[<>&"]/g, '')}</text>`)
   }
-  label(sp.bivouac ? (lang === 'en' ? 'Bivouac (living nest)' : '비박 (살아 있는 둥지)') : lang === 'en' ? 'Queen' : '여왕', q.cx * S + 3, (q.cy - q.ry) * S - 2, '#1a120a', '#e3a33b')
+  label(sp.bivouac ? (lang === 'en' ? 'Bivouac' : '비박') : lang === 'en' ? 'Queen' : '여왕', q.cx * S + 3, (q.cy - q.ry) * S - 2, '#1a120a', '#e3a33b')
   for (const c of w.chambers) if (c.type !== 'queen') label(RN[c.type], c.cx * S + 3, (c.cy - c.ry) * S - 2, '#efe4d2', 'rgba(20,14,10,.72)')
   // 목초지 이름은 그림 위에 쓰지 않는다 (대시보드에서 보여 준다)
   if (fd > 0) label(`${lang === 'en' ? 'Frost line' : '동결선'} ${fd}cm`, WW - 40, GY + (fd / CM) * S - 2, '#0b1a2a', 'rgba(220,240,255,.9)')
