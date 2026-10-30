@@ -1,5 +1,5 @@
 // 홍보용 화면 자동 촬영: 실제 시뮬레이션 엔진과 그림 코드로 장면을 돌려 릴스·유튜브 영상과 브런치 이미지를 만든다.
-// 실행: bun tools/capture.ts [출력 폴더]   (필요: Playwright와 Chromium, ffmpeg)
+// 실행: bun tools/capture.ts [출력 폴더] [reels|timelapse|brunch|readme]   (필요: Playwright와 Chromium, ffmpeg. 둘째 인자를 빼면 전부)
 // Playwright를 전역으로 깔았다면 PLAYWRIGHT_MODULE=<경로>/playwright/index.mjs, 브라우저 경로는 CHROME=<경로>로 지정
 // 실제 Claude Code 화면을 찍는 것이 아니라 플러그인과 같은 엔진·렌더러로 개미굴만 그린다.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -12,7 +12,7 @@ import type { World, Ant } from '../hooks/engine'
 import { svg, visibleRows, guestIcon } from '../hooks/render'
 import { GUESTS, RARITY_KO } from '../hooks/guests'
 
-const OUT = resolve(process.argv[2] ?? 'media-out'), FPS = 15
+const OUT = resolve(process.argv[2] ?? 'media-out'), FPS = 15, ONLY = process.argv[3], want = (k: string) => !ONLY || ONLY === k
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const CHROME = process.env.CHROME
 mkdirSync(OUT, { recursive: true })
@@ -25,6 +25,7 @@ if (!existsSync(FONT)) {
 }
 const fontCss = existsSync(FONT) ? `@font-face{font-family:NK;src:url(data:font/ttf;base64,${readFileSync(FONT).toString('base64')});font-weight:100 900}` : ''
 
+let LANG: 'ko' | 'en' = 'ko'   // 그림 속 방 이름표의 언어
 const browser = await chromium.launch({ executablePath: CHROME })
 
 // ---------- 군락 준비 ----------
@@ -76,7 +77,7 @@ async function video(name: string, Wd: number, Hd: number, vertical: boolean, sc
         const z = c.zoom ?? 1; nest.style.transform = `translateY(${-(c.y ?? 0)}px) scale(${z})`; nest.style.transformOrigin = `${c.ox ?? 50}% 0`; nest.style.width = nw + 'px'
         for (const k of ['top', 'chip', 'sub'] as const) { const el = document.getElementById(k)!; if (el.textContent !== (c[k] ?? '')) el.textContent = c[k] ?? '' }
         const ex = document.getElementById('extra')!; if (ex.dataset.v !== (c.extra ?? '')) { ex.innerHTML = c.extra ?? ''; ex.dataset.v = c.extra ?? '' }
-      }, [svg(w, ants, 'ko', nestW, frame * 0.5, phase), c, nestW] as [string, Cap, number])
+      }, [svg(w, ants, LANG, nestW, frame * 0.5, phase), c, nestW] as [string, Cap, number])
       ff.stdin.write(await page.screenshot({ type: 'jpeg', quality: 90 }))
       frame++
     }
@@ -92,7 +93,7 @@ const INSTALL = '/plugin install ant-nest --marketplace findot-ai/ant-nest'
 const endHtml = `<div class=end><div class=big>당신의 개미굴은?</div><div class=tag>무료 · 토큰 0 · 오픈소스</div><code>${INSTALL}</code><div class=url>github.com/findot-ai/ant-nest</div></div>`
 
 // 릴스·쇼츠 60초 (9:16) — 콘텐츠 문서의 숏폼 대본 순서
-await video('reels-60s-ko.mp4', 1080, 1920, true, async shot => {
+if (want('reels')) await video('reels-60s-ko.mp4', 1080, 1920, true, async shot => {
   const w = grown(90), ants: Ant[] = []; syncAnts(w, ants)
   const deepY = (y: number) => Math.max(0, (y - SURF - 6) * (1000 / W))
   await shot(w, ants, 3, { top: '회사에서 몰래\n개미를 키우고 있습니다', zoom: 1.6, y: 0 })
@@ -118,10 +119,26 @@ await video('reels-60s-ko.mp4', 1080, 1920, true, async shot => {
 })
 
 // 유튜브 데브로그 B롤: 16:9 성장 타임랩스 20초 (글자 없음)
-await video('timelapse-16x9.mp4', 1920, 1080, false, async shot => {
+if (want('timelapse')) await video('timelapse-16x9.mp4', 1920, 1080, false, async shot => {
   const g = newWorld({ ...DEFAULT_SETUP, stage: 'found' }), ga: Ant[] = []; syncAnts(g, ga)
   await shot(g, ga, 20, { y: 0 }, { timelapse: 14 })
 })
+
+// README 맨 위 GIF: 굴 윗부분에서 채집·굴착·결혼비행이 이어지는 9초 (글자 없음)
+if (want('readme')) for (const lg of ['en', 'ko'] as const) {
+  LANG = lg
+  await video(`readme-loop-${lg}.mp4`, 1200, 600, false, async shot => {
+    const w = grown(90), ants: Ant[] = []; syncAnts(w, ants)
+    await shot(w, ants, 3, {}, { each: i => { if (i % 5 === 0) sendForager(w, ants, i % 10 ? 1 : 2) } })
+    await shot(w, ants, 2, {}, { hourEvery: 20, each: i => { if (i % 4 === 0) { w.digQueue += 2; sendDigger(w, ants) } } })
+    w.flight = 0; startFlight(w, 4)
+    await shot(w, ants, 4, {}, { hourEvery: 70, each: i => { if (i % 8 === 0) sendForager(w, ants, 1) } })
+  })
+  const gif = join(OUT, `nest-${lg}.gif`)
+  await Bun.spawn(['ffmpeg', '-y', '-loglevel', 'error', '-i', join(OUT, `readme-loop-${lg}.mp4`), '-vf', 'fps=12,scale=800:-1:flags=neighbor,split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=none', gif]).exited
+  console.log('GIF', gif)
+}
+LANG = 'ko'
 
 // ---------- 브런치 이미지 ----------
 async function still(name: string, html: string, width: number, height?: number) {
@@ -130,7 +147,7 @@ async function still(name: string, html: string, width: number, height?: number)
   await page.screenshot({ path: join(OUT, name), fullPage: !height })
   await page.close(); console.log('이미지', join(OUT, name))
 }
-{
+if (want('brunch')) {
   const w = grown(150), ants: Ant[] = []; syncAnts(w, ants)
   for (let i = 0; i < 40; i++) moveAnts(w, ants)
   const nestH = (wd: number) => Math.round((wd * visibleRows(w)) / W)

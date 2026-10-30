@@ -3,6 +3,19 @@
 Every version of Ant Nest, newest first. Each entry is written in English, then Korean.
 개미굴의 모든 버전 기록입니다. 최신순이고, 각 항목은 영문 다음 국문입니다.
 
+## 0.16.0
+
+- Tools tab (`/ant tools`): the MCP servers and skills that fed the colony this week, with counts, plus built-in work and how often conversations were summarized.
+- Export for AI coaching (Report tab button, `/ant report export`): writes `ant-nest-report.md` with this week's counts, tools and questions to paste into Claude. Counts and tool names only.
+- After 5 minutes without AI activity the ants come home and rest in the chambers (😴 in the header). They scatter out again when work comes back.
+- A summarized conversation no longer costs food: the workers tidy the storage instead, and it is counted.
+- README: animated GIF at the top, Why, where it runs, troubleshooting.
+- 도구 지도 탭(`/ant tools`): 이번 주 군락을 먹인 MCP 서버와 스킬, 기본 작업 횟수, 대화 압축 횟수.
+- AI 코칭용 내보내기(리포트 탭 버튼, `/ant report export`): Claude에 붙여 넣을 `ant-nest-report.md`를 만듭니다. 횟수와 도구 이름만 담습니다.
+- AI 활동이 5분 없으면 개미들이 굴로 돌아와 방에서 쉽니다(머리글에 😴). 다시 일하면 흩어져 나갑니다.
+- 대화가 요약돼도 먹이를 잃지 않습니다. 대신 일개미들이 창고를 갈무리하고 횟수를 셉니다.
+- README: 맨 위 움직이는 GIF, 왜 만들었나, 어디서 돌아가나, 문제 해결.
+
 ## 0.15.0
 
 - After an update, the nest tells you once what's new (a toast and a History entry). The README explains how to turn on auto-update.

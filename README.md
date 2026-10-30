@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) ![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757) ![Languages](https://img.shields.io/badge/lang-English%20%7C%20한국어-blue)
 
-<p align="center"><img src="docs/nest-en.png" width="360" alt="Ant Nest: pixel-art cross-section of an ant colony with a centipede intrusion and a spider web"></p>
+<p align="center"><img src="docs/nest-en.gif" width="800" alt="Ant Nest in motion: foragers climb the trees, workers dig and haul soil to the mound, and winged ants take off on a nuptial flight"><br><sub><em>Read a file and a forager heads out. Edit and they dig. Ship and the winged ants fly.</em></sub></p>
 
 ```
 /plugin install ant-nest --marketplace findot-ai/ant-nest
@@ -17,6 +17,10 @@
 A colony of Japanese carpenter ants (*Camponotus japonicus*) lives beside your Claude Code session. Time runs only while you are connected: 30 minutes connected is one game day and about 35 hours is a game year. One generation, the life of one queen, lasts roughly 3 months of everyday use. Seasons turn, brood grows with soil temperature, and the frost line creeps down in winter. Think of it as a Tamagotchi for your AI workflow, built on real ant ecology.
 
 The colony's food and weather come from how you use AI. The mod never reads your code or conversation. It looks only at tool names and whether each call succeeded.
+
+## Why?
+
+You use Claude Code all day, but it's hard to see *how* you use it. Do you check your work, or only edit? Do you ever hand jobs to skills, MCP tools or parallel agents? Ant Nest turns that invisible habit into something alive beside your prompt. A balanced colony means balanced AI use, and the weekly report tells you what to try next. It installs with one line, runs inside Claude Code with no server or browser, costs zero tokens, and keeps everything on your computer.
 
 ## How your AI use maps to the nest
 
@@ -37,7 +41,8 @@ The colony's food and weather come from how you use AI. The mod never reads your
 | The same tool fails 3 times in a row | A centipede breaks in. Alarm pheromone spreads and the ants swarm it |
 | The failing tool succeeds again | Bug fixed: the centipede goes down and becomes protein |
 | A test fails | Rain |
-| A long conversation gets summarized | A mole passes and part of the storage caves in |
+| A long conversation gets summarized | The workers stack the scattered food neatly in storage (counted in the Tools tab) |
+| No AI activity for 5 minutes | The ants come home and rest in the chambers. They scatter out again when you get back to work |
 | An unfamiliar tool | The colony guesses its job from the name and remembers it |
 
 Over time your usage pattern gives the colony a type: Scout, Builder, Hunter, Delegator, Herder (MCP-heavy), Trailblazer (skill-heavy) or Instinct (automation-heavy).
@@ -94,6 +99,10 @@ Your colony level grows with peak population, years survived, bugs fixed and gen
 
 The Report tab shows this week so far: how your actions split across explore, edit, verify, ship, delegate, parallel agents, MCP, skills, planning and automation, compared with last week, plus what you do well, what you use less, and what to try next. Every Monday the previous week is finalized (`/ant report last`).
 
+**Get coached on it.** Press **Export for AI coaching** in the Report tab, or run `/ant report export`. It writes `ant-nest-report.md` with this week's counts, the MCP tools and skills you used, how often long conversations were summarized, and a few questions. Paste it into a Claude conversation and ask how to get more out of AI. It holds counts and tool names only, with no conversation text or file paths.
+
+**Tools tab.** See which MCP servers and skills fed the colony this week, with counts, plus your built-in work and how often conversations were summarized (`/ant tools` in a terminal).
+
 The dashboard shows how each number changed since yesterday, like `38 (+5)`. There is one colony per computer, shared by every project. Several Claude Code windows open at once share it: one window runs it and the others pass their activity along.
 
 ## Show your colony
@@ -108,6 +117,8 @@ Run `/ant stats`, take a screenshot, and post it with the [Show your colony](htt
 - `/ant version`: which version this window runs, and whether it runs the colony or follows it
 - `/ant off` · `/ant on`: turn the nest off (or back on) for the current project only. Off means no pane, no status line, and work there doesn't count
 - `/ant report` · `/ant report last`: your AI use report for this week, or last week's
+- `/ant report export`: write `ant-nest-report.md` to paste into Claude for coaching
+- `/ant tools`: this week's MCP tools, skills and conversation summaries
 - `/ant dex`: the creature dex
 - `/ant gift` · `/ant adopt <code>`: gift a queen, adopt one
 - `/ant card`: write your profile card
@@ -139,15 +150,39 @@ In the desktop app: click + next to the prompt box, then Plugins, Add marketplac
 
 The desktop app draws the nest as pixel art in a side pane. A terminal draws it with half-block characters. On a narrow terminal the pane does not open by itself; use `/ant`.
 
+## Where it runs
+
+| Where | How the nest is drawn |
+|---|---|
+| Claude desktop app (Mac, Windows) | Pixel art in a side pane, with dashboard and tabs |
+| VS Code extension | Pixel art in a pane, with dashboard and tabs |
+| Claude mobile app | Pixel art, with dashboard and tabs |
+| Terminal (macOS, Linux, Windows) | Half-block characters, with dashboard and tabs |
+
+Windows works in PowerShell too: your first-run history is read with PowerShell when it's large.
+
+## Troubleshooting
+
+- **The pane doesn't show up.** Run `/ant`. On a narrow terminal the pane doesn't open by itself.
+- **The pane is blank or an old version runs.** Run `/ant version`, then update with `/plugin marketplace update ant-nest` and restart Claude Code.
+- **Several windows show different numbers.** One window runs the colony and the others follow it. Use `/ant hide` in the windows where you don't want to see it.
+- **I don't want it in one project.** `/ant off` there. Work in that project stops counting.
+- **Nothing seems to change.** Time runs only while you're connected: 75 seconds is a game hour. The dashboard shows the next hatch and changes since yesterday.
+- **Start over.** `/ant new <species>` keeps your dex and history; `/ant reset` wipes everything.
+
 ---
 
 ## 한국어
 
-<p align="center"><img src="docs/nest-ko.png" width="360" alt="개미굴: 지네가 침입하고 거미줄이 쳐진 개미 군락 단면 도트 그림"></p>
+<p align="center"><img src="docs/nest-ko.gif" width="800" alt="움직이는 개미굴: 채집 개미가 나무에 오르고, 일개미가 굴을 파 흙을 나르고, 날개 달린 개미가 결혼비행을 떠난다"><br><sub><em>파일을 읽으면 채집을 나가고, 고치면 굴을 파고, 배포하면 날개미가 날아오릅니다.</em></sub></p>
 
 Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간은 접속해 있을 때만 흐릅니다. 접속 30분이 게임 하루, 약 35시간이 게임 1년입니다. 여왕 한 마리의 일생인 한 세대는 매일 쓰면 현실로 약 3개월입니다. 계절이 바뀌고, 새끼가 땅속 온도에 따라 자라고, 겨울에는 동결선이 내려옵니다.
 
 군락의 먹이와 날씨는 당신의 AI 활용입니다. 코드나 대화 내용은 읽지 않고, 도구 이름과 성공 여부만 봅니다.
+
+## 왜 만들었나
+
+Claude Code를 하루 종일 쓰지만, *어떻게* 쓰고 있는지는 잘 보이지 않습니다. 고치기만 하고 확인은 안 하는지, 스킬이나 MCP 도구, 병렬 에이전트에 일을 맡겨 본 적은 있는지. 개미굴은 보이지 않던 습관을 입력창 옆에서 살아 움직이게 만듭니다. 군락이 고르게 크면 AI도 고르게 쓰고 있다는 뜻이고, 주간 리포트가 다음에 해 볼 것을 알려 줍니다. 설치는 한 줄, 서버나 브라우저 없이 Claude Code 안에서 돌고, 토큰은 0, 모든 기록은 내 컴퓨터에만 남습니다.
 
 ## 내 AI 활용이 개미굴에 반영되는 방식
 
@@ -168,7 +203,8 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 | 같은 도구가 3번 연속 오류 | 지네 침입. 경보 페로몬이 퍼지면 개미들이 몰려든다 |
 | 실패했던 도구가 다시 성공 | 버그를 잡았다: 지네 격퇴, 단백질이 된다 |
 | 테스트 실패 | 비 |
-| 긴 대화가 요약됨 | 두더지가 지나가며 창고 한쪽이 무너진다 |
+| 긴 대화가 요약됨 | 일개미들이 흩어진 먹이를 창고에 갈무리한다 (도구 지도 탭에 횟수 기록) |
+| 5분 동안 AI 활동이 없음 | 개미들이 굴로 돌아와 방에서 쉰다. 다시 일하면 흩어져 나간다 |
 | 처음 보는 도구 | 이름으로 일을 짐작해 배우고 기억한다 |
 
 쓰는 패턴이 쌓이면 군락 유형이 정해집니다: 정찰형, 건축형, 사냥형, 분업형, 목축형(MCP 위주), 길잡이형(스킬 위주), 본능형(자동화 위주).
@@ -233,6 +269,10 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 
 리포트 탭에서 이번 주 지금까지의 활동을 봅니다. 탐색·편집·검증·출시·위임·병렬·MCP·스킬·계획·자동화의 비중, 지난주 대비 변화, 잘하고 있는 점·덜 쓰는 점·다음에 해 볼 것이 나옵니다. 매주 월요일에 지난주 리포트가 확정됩니다(`/ant report last`).
 
+**AI에게 코칭받기.** 리포트 탭의 **AI 코칭용으로 내보내기**를 누르거나 `/ant report export`를 실행하면 `ant-nest-report.md`가 생깁니다. 이번 주 활동 횟수, 쓴 MCP 도구와 스킬, 긴 대화가 압축된 횟수, 같이 생각해 볼 질문이 들어 있습니다. Claude 대화에 붙여 넣고 "내 AI 활용을 코칭해줘"라고 해 보세요. 횟수와 도구 이름만 있고 대화 내용이나 파일 경로는 없습니다.
+
+**도구 지도 탭.** 이번 주 군락을 먹인 MCP 서버와 스킬을 횟수와 함께 보여 줍니다. 기본 작업 횟수와 대화 압축 횟수도 나옵니다(터미널에서는 `/ant tools`).
+
 대시보드 숫자 옆에는 어제 대비 변화가 `38 (+5)`처럼 붙습니다. 군락은 컴퓨터마다 하나이고 모든 프로젝트가 함께 키웁니다. Claude Code 창을 여러 개 열어도 군락은 하나입니다. 한 창이 군락을 돌리고, 나머지 창은 자기 활동을 그 창에 넘깁니다.
 
 ## 내 군락 자랑하기
@@ -247,6 +287,8 @@ Claude Code 옆에서 일본왕개미 군락이 살아 움직입니다. 시간�
 - `/ant version`: 이 창의 버전과, 이 창이 군락을 돌리는지 따라 보는지
 - `/ant off` · `/ant on`: 지금 프로젝트에서만 개미굴 끄기·켜기. 끄면 창과 상태줄이 뜨지 않고 그 프로젝트의 작업은 반영되지 않음
 - `/ant report` · `/ant report last`: 이번 주 AI 활용 리포트, 지난주 리포트
+- `/ant report export`: Claude에 붙여 넣어 코칭받을 `ant-nest-report.md` 만들기
+- `/ant tools`: 이번 주 쓴 MCP 도구, 스킬, 대화 압축 횟수
 - `/ant dex`: 생물 도감
 - `/ant gift` · `/ant adopt <코드>`: 여왕 선물하기, 입양하기
 - `/ant card`: 프로필 카드 만들기
@@ -277,6 +319,26 @@ claude plugin install ant-nest --marketplace findot-ai/ant-nest
 **업데이트 자동으로 받기.** 개인 마켓플레이스는 자동 업데이트가 기본으로 꺼져 있습니다. `/plugin` → **Marketplaces** → `ant-nest` → **Enable auto-update**를 켜 두세요. 켜지 않으면 `/plugin marketplace update ant-nest`로 직접 업데이트합니다. 업데이트된 뒤 처음 켜질 때 개미굴이 새 기능을 한 번 알려 줍니다.
 
 데스크톱 앱에서는 옆 창에 도트 그림으로, 터미널에서는 반 블록 문자로 그립니다. 터미널 폭이 좁으면 창이 자동으로 뜨지 않으니 `/ant`로 여세요.
+
+## 어디서 돌아가나
+
+| 어디서 | 그리는 방식 |
+|---|---|
+| Claude 데스크톱 앱 (Mac, Windows) | 옆 창에 도트 그림, 대시보드와 탭 |
+| VS Code 확장 | 창에 도트 그림, 대시보드와 탭 |
+| Claude 모바일 앱 | 도트 그림, 대시보드와 탭 |
+| 터미널 (macOS, Linux, Windows) | 반 블록 문자, 대시보드와 탭 |
+
+Windows의 PowerShell에서도 돌아갑니다. 처음 분석할 때 큰 기록은 PowerShell로 흘려 읽습니다.
+
+## 문제 해결
+
+- **창이 안 떠요.** `/ant`를 입력하세요. 터미널 폭이 좁으면 창이 자동으로 뜨지 않습니다.
+- **화면이 비어 있거나 옛 버전이 돌아요.** `/ant version`으로 확인하고, `/plugin marketplace update ant-nest` 뒤 Claude Code를 다시 시작하세요.
+- **창마다 숫자가 달라요.** 한 창이 군락을 돌리고 나머지는 따라 봅니다. 보기 싫은 창에서는 `/ant hide`.
+- **이 프로젝트에서는 안 키우고 싶어요.** 그 프로젝트에서 `/ant off`. 그곳 작업은 반영되지 않습니다.
+- **변화가 없어요.** 시간은 접속해 있을 때만 흐릅니다(75초가 게임 1시간). 대시보드에 다음 부화와 어제 대비 변화가 나옵니다.
+- **처음부터 다시.** `/ant new <종>`은 도감과 기록을 남기고, `/ant reset`은 모두 지웁니다.
 
 ---
 

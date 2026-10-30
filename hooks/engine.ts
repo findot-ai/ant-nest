@@ -27,12 +27,14 @@ export type Lineage = { gen: number; species: SpeciesId; years: number; peak: nu
 export type Origin = { stage: Stage0; ko: string; en: string }
 export type Stage0 = 'found' | 'young' | 'mature'
 export type Setup = { species: SpeciesId; stage: Stage0; farms: string[]; trail: number; instinct: number; majorBias: number; storeBias: number; ko: string; en: string }
+// 이번 주에 군락을 먹인 외부 도구(MCP 서버)와 스킬, 대화 압축 횟수. 이름과 횟수만 이 컴퓨터에 남는다
+export type ToolWeek = { key: string; mcp: Record<string, number>; skill: Record<string, number>; compact: number }
 export type Snap = { pop: number; workers: number; majors: number; raiders: number; slaves: number; brood: number; rooms: number; depth: number; carb: number; prot: number; level: number; dex: number }
 export type LogLine = { s: number; d: number; ko: string; en: string }
 export type Tally = { explore: number; build: number; hunt: number; raise: number; bugs: number; fixed: number; mcp: number; skill: number; auto: number; plan: number; parallel: number; ship: number; other: number }
 
 export type World = {
-  v: 4; over?: boolean; flightTick?: number; weekSince?: string; need?: { dig: boolean; hunt: boolean }; noteDay?: Record<string, number>; snapDate?: string; snap?: Snap; weekKey?: string; week?: Tally; lastWeek?: { key: string; tally: Tally }; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
+  v: 4; over?: boolean; lastAct?: number; resting?: boolean; tools?: ToolWeek; toolsLast?: ToolWeek; flightTick?: number; weekSince?: string; need?: { dig: boolean; hunt: boolean }; noteDay?: Record<string, number>; snapDate?: string; snap?: Snap; weekKey?: string; week?: Tally; lastWeek?: { key: string; tally: Tally }; fed?: number; mound?: number; guests: { id: GuestId; x: number; y: number; days: number }[]; dex: Record<string, { n: number; first: string }>; newDex: string[]; gift?: string; raid?: { t: number; booty: number } | null; raidDay?: number; seed: number; species: SpeciesId; gen: number; lineage: Lineage[]; peak: number; flownYear: number; alates: number; flight: number; origin: Origin; grid: number[]; chambers: Chamber[]; trees: { x: number; h: number; farm?: string }[]
   ep: number; day: number; tick: number; cohorts: Cohort[]; brood: Brood[]; carb: number; prot: number
   queen: { room: number; home: number; health: number; age: number }; deepest: number; tips: { x: number; y: number; dx: number; dy: number; len?: number; type?: RoomType; link?: boolean }[]; shaft?: { x: number; y: number }
   digQueue: number; rain: number; threats: Threat[]; streak: Record<string, number>; log: LogLine[]
@@ -506,8 +508,19 @@ export function moveAnts(w: World, ants: Ant[]) {
   // 돌아다닐 목적지 후보: 굴 칸 전체 (한 번만 모은다)
   const tunnels: number[] = []; for (let i = SURF * W; i < W * H; i++) if (w.grid[i] === TUN) tunnels.push(i)
   const canWork = !isWinter(w) && w.rain <= 0 && isDay(w), worker = SP(w).dulotic ? 's' : 'w'
-  for (const a of ants) {
+  // 쉬는 중(한동안 AI 활동이 없음): 밖에 나간 개미는 돌아오고, 굴 안 개미는 방에 모여 쉰다
+  const restRooms = w.resting ? w.chambers.filter(c => c.type !== 'waste') : []
+  for (const [i, a] of ants.entries()) {
     const ox = a.x
+    if (w.resting && a.st === 'out' && a.job !== 'haul' && !a.carry) { a.carry = 1; a.climb = 0 }
+    if (w.resting && a.st === 'in' && a.job !== 'swarm' && !cen && restRooms.length) {
+      const c = restRooms[i % restRooms.length]!
+      if (w.grid[idx(a.x, a.y)] !== TUN) { a.x = qr.cx; a.y = qr.cy }
+      a.job = a.kind === 'm' ? 'guard' : 'idle'; a.gx = undefined
+      if (rnd() < 0.5) step(w, a, c.cx + ((i * 3) % (c.rx * 2 + 1)) - c.rx, c.cy + c.ry, 0.85)
+      if (a.x !== ox) a.f = a.x > ox ? 1 : -1
+      continue
+    }
     moveOne(a)
     if (a.x !== ox) a.f = a.x > ox ? 1 : -1
   }

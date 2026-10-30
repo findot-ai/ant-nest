@@ -2,7 +2,7 @@
 import type { Tally, Lang } from './engine'
 
 export type Kind = 'explore' | 'build' | 'hunt' | 'raise' | 'mcp' | 'skill' | 'auto' | 'plan' | 'parallel' | 'ship' | 'other'
-export type Use = { kind: Kind; server?: string; setup?: boolean; guessed?: boolean; verify?: boolean }
+export type Use = { kind: Kind; server?: string; skill?: string; setup?: boolean; guessed?: boolean; verify?: boolean }
 
 // 검증: 빌드·검사·테스트, 서버 응답 확인
 const TESTLIKE = /\b(test|pytest|jest|vitest|mocha|go test|cargo test|npm run (test|build|lint|check|typecheck)|pnpm (test|build|lint)|yarn (test|build|lint)|tsc|eslint|make|gradle|mvn|curl|wget|Invoke-WebRequest|Invoke-RestMethod|lighthouse|playwright)\b/i
@@ -27,9 +27,9 @@ export function classify(tool: string, input: Record<string, unknown>): Use {
     if (BROWSER_SERVER.test(server) && BROWSER_TOOL.test(name)) return { kind: 'hunt', verify: true }
     return { kind: 'mcp', server }
   }
-  if (tool === 'Skill') return { kind: 'skill' }
+  if (tool === 'Skill') return { kind: 'skill', skill: String(input.skill ?? input.name ?? '').replace(/^.*:/, '') || undefined }
   // 스킬 문서를 직접 읽어 적용한 것도 스킬 사용으로 본다
-  if (tool === 'Read' && /[\\/]skills[\\/].*SKILL\.md$/i.test(String(input.file_path ?? ''))) return { kind: 'skill' }
+  if (tool === 'Read' && /[\\/]skills[\\/].*SKILL\.md$/i.test(String(input.file_path ?? ''))) return { kind: 'skill', skill: /([^\\/]+)[\\/]SKILL\.md$/i.exec(String(input.file_path))?.[1] }
   if (PLAN.test(tool)) return { kind: 'plan' }
   if (PARALLEL.test(tool) || ((tool === 'Agent' || tool === 'Task') && input.run_in_background === true)) return { kind: 'parallel' }
   if (tool === 'Agent' || tool === 'Task') return { kind: 'raise' }

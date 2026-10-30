@@ -17,16 +17,17 @@ const EFFECT = {
 } as const
 import type { GuestId } from './guests'
 import type { SpeciesId } from './species'
-import type { World, Ant, Tally, Lang, LogLine } from './engine'
+import type { World, Ant, Tally, Lang, LogLine, ToolWeek } from './engine'
 import { svg, raster, visibleRows, guestIcon } from './render'
 import { W } from './engine'
 import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
-const VERSION = '0.15.0'
+const VERSION = '0.16.0'
 // 업데이트 직후 처음 켜질 때 한 번 알려 줄 새 기능 (최근 것만, 전체는 CHANGELOG.md)
 const WHATS_NEW: Record<string, [string, string]> = {
+  '0.16.0': ['도구 지도 탭 · AI 코칭용 리포트 내보내기 · 쉬는 개미들 · 대화 압축은 창고 갈무리로', 'Tools tab · export your report for AI coaching · resting ants · summaries now tidy the storage'],
   '0.15.0': ['업데이트 알림 · 방끼리 이어지는 굴과 샛길 · 기록 5개씩 넘겨 보기 · 눈에 띄는 병정개미와 생물', 'Update notes · chambers that branch and link up · paged history · easy-to-spot majors and creatures'],
 }
 const PANE = 'ant-nest'
@@ -107,6 +108,16 @@ export const register: Register = (on, options) => {
   const applyEvent = (ev: Ev): string | undefined => {
     const { tool, failed, use } = ev
     let toast: string | undefined
+    // 한동안 쉬던 군락이 다시 일을 시작한다
+    if (w.resting) { w.resting = false; say(w, '다시 일이 들어왔다. 쉬던 개미들이 흩어져 나간다.', 'Work is back. The resting ants scatter out of the chambers.'); for (let k = 0; k < 3; k++) sendForager(w, ants, 1) }
+    w.lastAct = Date.now()
+    // 대화 압축: 흩어진 먹이를 창고에 갈무리한다 (벌칙 없음, 횟수만 센다)
+    if (tool === COMPACT) {
+      toolWeek(w).compact++
+      say(w, '긴 대화가 요약됐다. 일개미들이 흩어진 먹이를 창고에 차곡차곡 갈무리했다.', 'The long conversation was summarized. The workers stacked the scattered food neatly in storage.')
+      for (let k = 0; k < 4; k++) sendForager(w, ants, 1)
+      return
+    }
     if (failed) {
       bump('bugs')
       w.streak[tool] = (w.streak[tool] ?? 0) + 1
@@ -143,9 +154,10 @@ export const register: Register = (on, options) => {
         if (SP(w).dulotic) { if (!startRaid(w, bk) && w.raid) w.raid.booty += 0.4 * bk }
         else { w.brood.push({ st: 'egg', n: bk, dev: 0, prot: 0, room: w.queen.room }); say(w, '일을 나눠 맡겼다. 여왕이 알을 더 낳았다.', 'Work was delegated. The queen laid extra eggs.') }
         break
-      case 'mcp': { bump('mcp'); const t = farmFor(w, use.server ?? 'mcp', ev.mcpTool); w.carb += gain(0.5 * bk); sendTo(w, ants, t.x, t.h, 1); break }
+      case 'mcp': { bump('mcp'); const tw = toolWeek(w), nm = prettyServer(use.server ?? 'mcp', ev.mcpTool); tw.mcp[nm] = (tw.mcp[nm] ?? 0) + 1; const t = farmFor(w, use.server ?? 'mcp', ev.mcpTool); w.carb += gain(0.5 * bk); sendTo(w, ants, t.x, t.h, 1); break }
       case 'skill': {
-        bump('skill'); const before = Math.floor(w.trail); w.trail = Math.min(3, w.trail + 0.3)
+        bump('skill'); { const tw = toolWeek(w), nm = use.skill || '?'; tw.skill[nm] = (tw.skill[nm] ?? 0) + 1 }
+        const before = Math.floor(w.trail); w.trail = Math.min(3, w.trail + 0.3)
         if (Math.floor(w.trail) > before) say(w, '익힌 방법(스킬)을 다시 썼다. 페로몬 길이 짙어져 채집이 빨라진다.', 'A learned method (skill) was reused. The pheromone trail grows stronger and foraging speeds up.')
         break
       }
@@ -171,7 +183,7 @@ export const register: Register = (on, options) => {
     muted = (((await $.store.get('off')) as string[] | undefined) ?? []).includes(cwd)
     hidden = (((await $.store.get('hide')) as string[] | undefined) ?? []).includes(cwd)
     const saved = (await $.store.get('world')) as World | undefined
-    if (saved && saved.v === 4 && Array.isArray(saved.grid)) { w = saved; w.guests ??= []; w.dex ??= {}; w.newDex ??= []; w.lineage ??= []; say(w, '다시 접속했다. 개미들이 하던 일을 이어 간다.', 'You are back. The ants pick up where they left off.') }
+    if (saved && saved.v === 4 && Array.isArray(saved.grid)) { w = saved; w.guests ??= []; w.dex ??= {}; w.newDex ??= []; w.lineage ??= []; w.resting = false; say(w, '다시 접속했다. 개미들이 하던 일을 이어 간다.', 'You are back. The ants pick up where they left off.') }
     else {
       // 처음 설치: 이 컴퓨터의 Claude Code 기록을 로컬에서만 훑어 시작 군락을 정한다 (개수만 세고 원문은 남기지 않음)
       const p = emptyProfile()
@@ -207,13 +219,13 @@ export const register: Register = (on, options) => {
       say(w, setup.ko, setup.en)
       await $.store.set('world', w)
     }
-    ants = []; syncAnts(w, ants)
+    ants = []; syncAnts(w, ants); w.lastAct = Date.now()
     rollDay(w, localDate(), weekKey())
     { const L = (await $.store.get('leader')) as { id: string; ts: number } | undefined
       if (!muted && (!L || Date.now() - L.ts > 30000)) { leader = true; await $.store.set('leader', { id: me, ts: Date.now() }); await $.store.set('world', w) } }
     // 사람 없이 돌아가는 세션(-p, SDK, 예약 실행)은 자동화다
     if (!e.isInteractive) { w.instinct = Math.min(10, w.instinct + 0.5); bump('auto') }
-    await $.command.register({ name: 'ant', description: '개미굴 / Ant nest — hide·show(이 프로젝트 화면만 숨기기) · off·on(이 프로젝트 끄기) · report · stats · dex · species · new <종> · gift · adopt · card · version · reset' })
+    await $.command.register({ name: 'ant', description: '개미굴 / Ant nest — hide·show(이 프로젝트 화면만 숨기기) · off·on(이 프로젝트 끄기) · report · report export(AI 코칭용 내보내기) · tools · stats · dex · species · new <종> · gift · adopt · card · version · reset' })
     // 버전이 바뀐 뒤 첫 실행이면 새 기능을 한 번 알린다 (처음 설치할 때는 조용히 기록만)
     { const seen = (await $.store.get('seenVersion')) as string | undefined
       if (seen !== VERSION) {
@@ -227,6 +239,7 @@ export const register: Register = (on, options) => {
     if (!quiet()) { const opened = await $.ui.open({ id: PANE, title: T.title }); paneNote = opened.isPlaced ? 'placed' : opened.reason }
     $.clock.every(FRAME_MS, () => {
       frame++
+      if (leader) w.resting = Date.now() - (w.lastAct ?? Date.now()) > REST_MS && w.threats.length === 0
       moveAnts(w, ants)
       if (frame % 20 === 0) void (async () => {
         const L = (await $.store.get('leader')) as { id: string; ts: number } | undefined, now = Date.now()
@@ -298,8 +311,7 @@ export const register: Register = (on, options) => {
   })
 
   on('session.compact', async ($, e, next) => {
-    w.carb *= 0.9
-    say(w, '긴 대화가 요약됐다. 두더지가 지나가며 창고 한쪽이 무너졌다.', 'The long conversation was summarized. A mole passed and part of the storage caved in.')
+    if (!muted) { const ev: Ev = { tool: COMPACT, failed: false, testFail: false, use: { kind: 'other' }, mcpTool: '' }; if (leader) applyEvent(ev); else pending.push(ev) }
     return next(e)
   })
 
@@ -332,6 +344,14 @@ export const register: Register = (on, options) => {
     }
     if (muted) return { text: en ? 'Ant nest is off in this project. /ant on turns it back on.' : '이 프로젝트에서는 개미굴이 꺼져 있습니다. 다시 켜려면 /ant on' }
     if (/^(new|adopt|reset)/.test(arg) && !leader) { leader = true; await $.store.set('leader', { id: me, ts: Date.now() }) }
+    if (arg === 'report export') {
+      await $.fs.write(REPORT_FILE, exportReport(w, lang))
+      return { text: en ? `Wrote ${REPORT_FILE} in this folder. Paste it into a Claude conversation and ask for coaching on how you use AI. It holds only counts and tool names, no conversation text. Don't commit it.` : `이 폴더에 ${REPORT_FILE}를 만들었습니다. Claude 대화에 붙여 넣고 "내 AI 활용을 코칭해줘"라고 해 보세요. 횟수와 도구 이름만 들어 있고 대화 내용은 없습니다. 저장소에 올리지는 마세요.` }
+    }
+    if (arg === 'tools') {
+      const tw = toolWeek(w), list = (o: Record<string, number>) => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, n]) => `  ${k === '?' ? (en ? '(unnamed)' : '(이름 없음)') : k} ${n}`)
+      return { text: [en ? `Tool map · week of ${tw.key}` : `도구 지도 · ${tw.key} 주`, en ? 'External tools (MCP)' : '외부 도구 (MCP)', ...(list(tw.mcp).length ? list(tw.mcp) : [en ? '  none yet' : '  아직 없음']), en ? 'Skills' : '스킬', ...(list(tw.skill).length ? list(tw.skill) : [en ? '  none yet' : '  아직 없음']), `${en ? 'Conversations summarized' : '대화 압축'} ${tw.compact}`].join('\n') }
+    }
     if (arg === 'report' || arg === 'report last') {
       const last = arg === 'report last' && w.lastWeek, r = buildReport(last ? w.lastWeek!.tally : w.week ?? emptyTally(), last ? undefined : w.lastWeek?.tally, lang), en = lang === 'en'
       const head = en ? `AI use report · ${last ? `week of ${w.lastWeek!.key}` : 'this week so far'} · ${r.total} actions` : `AI 활용 리포트 · ${last ? `${w.lastWeek!.key} 주` : '이번 주 지금까지'} · 활동 ${r.total}번`
@@ -518,7 +538,24 @@ export const register: Register = (on, options) => {
         <Text size="caption" dimColor>{en ? 'Now' : '지금'}: {T.gen(w.gen)} · {en ? 'peak' : '최대'} {Math.round(w.peak)} · Lv{colonyLevel(w)}</Text>
       </Box>
     )
-    const TABS: [string, string][] = [['dash', en ? 'Dashboard' : '대시보드'], ['report', en ? 'Report' : '리포트'], ['log', en ? 'History' : '기록'], ['dex', en ? 'Creatures' : '생물 도감'], ['line', en ? 'Lineage' : '혈통']]
+    // 도구 지도: 이번 주 군락을 먹인 외부 도구(MCP)와 스킬
+    const tw = w.tools?.key === weekKey() ? w.tools : undefined
+    const toolRows = (o: Record<string, number> | undefined) => { const e = Object.entries(o ?? {}).sort((a, b) => b[1] - a[1]); const mx = Math.max(1, ...e.map(x => x[1])); return e.map(([k, n]) => row(k === '?' ? (en ? '(unnamed)' : '(이름 없음)') : k, String(n), bar(n, mx, 8))) }
+    const wk = w.week ?? emptyTally()
+    const tools = (
+      <Box flexDirection="column" gap={1}>
+        <Text size="footnote" dimColor>{en ? 'What fed the colony this week. Only names and counts stay on this computer.' : '이번 주 군락을 먹인 도구입니다. 이름과 횟수만 이 컴퓨터에 남습니다.'}</Text>
+        {card(en ? 'External tools (MCP) · each server is an aphid tree outside' : '외부 도구 (MCP) · 서버 하나가 굴 밖 진딧물 나무 하나', <Box flexDirection="column">{toolRows(tw?.mcp).length ? toolRows(tw?.mcp) : <Text size="caption" dimColor>{en ? 'No MCP tools yet this week. Connect one (Drive, GitHub, Slack…) and a new tree grows.' : '이번 주에는 아직 MCP 도구를 쓰지 않았습니다. Drive·GitHub·Slack 같은 도구를 연결하면 나무가 하나 늘어납니다.'}</Text>}</Box>)}
+        {card(en ? 'Skills · they lay pheromone trails' : '스킬 · 페로몬 길을 깐다', <Box flexDirection="column">{toolRows(tw?.skill).length ? toolRows(tw?.skill) : <Text size="caption" dimColor>{en ? 'No skills yet this week. Call one by name, like /skill-name.' : '이번 주에는 아직 스킬을 쓰지 않았습니다. /스킬이름 처럼 불러 보세요.'}</Text>}</Box>)}
+        {card(en ? 'Built-in work this week' : '이번 주 기본 작업', <Box flexDirection="column">
+          {row(T.exploreS, String(wk.explore))}{row(T.buildS, String(wk.build))}{row(en ? 'Verify' : '검증', String(wk.hunt))}{row(en ? 'Ship' : '출시', String(wk.ship ?? 0))}
+          {row(en ? 'Delegate · parallel' : '위임 · 병렬', `${wk.raise} · ${wk.parallel}`)}{row(en ? 'Plan · automate' : '계획 · 자동화', `${wk.plan} · ${wk.auto}`)}
+          {row(en ? 'Conversations summarized' : '대화 압축', String(tw?.compact ?? 0))}
+        </Box>)}
+        {w.toolsLast && <Text size="caption" dimColor>{en ? 'Last week' : '지난주'}: MCP {Object.keys(w.toolsLast.mcp).length}{en ? ' tools' : '개'} · {en ? 'skills' : '스킬'} {Object.keys(w.toolsLast.skill).length}{en ? '' : '개'} · {en ? 'summarized' : '압축'} {w.toolsLast.compact}</Text>}
+      </Box>
+    )
+    const TABS: [string, string][] = [['dash', en ? 'Dashboard' : '대시보드'], ['report', en ? 'Report' : '리포트'], ['log', en ? 'History' : '기록'], ['tools', en ? 'Tools' : '도구 지도'], ['dex', en ? 'Creatures' : '생물 도감'], ['line', en ? 'Lineage' : '혈통']]
     // 리포트: 이번 주 지금까지 (지난주와 비교)
     const rep = buildReport(w.week ?? emptyTally(), w.lastWeek?.tally, lang), rmax = Math.max(1, ...rep.rows.map(r => r.n))
     const report = (
@@ -531,6 +568,11 @@ export const register: Register = (on, options) => {
         {rep.good.length > 0 && <Box flexDirection="column" borderStyle="round" borderColor="success" paddingX={1}><Text size="caption" weight="semibold" color="success">{en ? 'Doing well' : '잘하고 있는 점'}</Text>{rep.good.map(x => <Text size="footnote">• {x}</Text>)}</Box>}
         {rep.gaps.length > 0 && <Box flexDirection="column" borderStyle="round" borderColor="warning" paddingX={1}><Text size="caption" weight="semibold" color="warning">{en ? 'Using less' : '덜 쓰는 점'}</Text>{rep.gaps.map(x => <Text size="footnote">• {x}</Text>)}</Box>}
         {rep.tips.length > 0 && <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1}><Text size="caption" weight="semibold">{en ? 'Try next' : '다음에 해 볼 것'}</Text>{rep.tips.map(x => <Text size="footnote">• {x}</Text>)}</Box>}
+        {(w.tools?.compact ?? 0) >= 3 && <Text size="footnote" color="warning">• {en ? `Long conversations were summarized ${w.tools!.compact} times this week. Split big jobs and start a fresh conversation for each.` : `이번 주 긴 대화가 ${w.tools!.compact}번 압축됐습니다. 큰 작업은 나눠서 새 대화로 시작해 보세요.`}</Text>}
+        <Box gap={1} alignItems="center" flexWrap="wrap">
+          <Button key="report-export" label={en ? 'Export for AI coaching' : 'AI 코칭용으로 내보내기'} variant="secondary" onPress={() => { void (async () => { await $.fs.write(REPORT_FILE, exportReport(w, lang)); $.ui.toast(en ? `🐜 Wrote ${REPORT_FILE}. Paste it into Claude and ask for coaching.` : `🐜 ${REPORT_FILE}를 만들었습니다. Claude에 붙여 넣고 코칭을 받아 보세요.`) })() }} />
+          <Text size="caption" dimColor>{en ? 'Counts and tool names only, no conversation text' : '횟수와 도구 이름만, 대화 내용은 없음'}</Text>
+        </Box>
         {rep.total < 20 && <Text size="caption" dimColor>{en ? 'More detail appears after about 20 actions this week. A final report for each week arrives on Monday (/ant report last).' : '이번 주 활동이 20번쯤 쌓이면 더 자세히 나옵니다. 매주 월요일에 지난주 리포트가 확정됩니다 (/ant report last).'}</Text>}
       </Box>
     )
@@ -539,14 +581,14 @@ export const register: Register = (on, options) => {
       <Box gap={1} flexWrap="wrap">
         {TABS.map(([k, label]) => <Button key={`tab-${k}`} label={label} variant={tab === k ? 'primary' : 'secondary'} onPress={() => { void update($, tabAtom, () => k); void update($, logPageAtom, () => 0) }} />)}
       </Box>
-      {tab === 'log' ? history : tab === 'dex' ? dex : tab === 'line' ? lineage : tab === 'report' ? report : dashboard}
+      {tab === 'log' ? history : tab === 'tools' ? tools : tab === 'dex' ? dex : tab === 'line' ? lineage : tab === 'report' ? report : dashboard}
     </Box>
     return (
       <Box flexDirection="column" gap={1}>
         <Box flexDirection="column">
           <Box justifyContent="space-between" flexWrap="wrap" gap={1}>
             <Text size="heading" weight="bold">🐜 {pop} <Text size="footnote" dimColor>{en ? 'ants' : '마리'}</Text>{dl('pop') !== 0 && <Text size="footnote" color={dl('pop') > 0 ? 'success' : 'error'}> {dl('pop') > 0 ? '▲' : '▼'}{Math.abs(dl('pop'))} {en ? 'since yesterday' : '어제보다'}</Text>}</Text>
-            <Text size="footnote" dimColor>{when()} · {clock} · {airT(w).toFixed(0)}°C</Text>
+            <Text size="footnote" dimColor>{when()} · {clock} · {airT(w).toFixed(0)}°C{w.resting ? (en ? ' · 😴 resting' : ' · 😴 쉬는 중') : ''}</Text>
           </Box>
           <Text size="caption" dimColor>{badge()}</Text>
         </Box>
@@ -591,3 +633,38 @@ function card(w: World, lang: Lang) {
 function localDate() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 // 이번 주 월요일 날짜 (주간 리포트 기준)
 function weekKey() { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+
+// 도구 기록과 휴식, AI 코칭용 내보내기
+const COMPACT = '__compact', REST_MS = 5 * 60_000, REPORT_FILE = 'ant-nest-report.md'
+// 이번 주 도구 기록: 주가 바뀌면 지난주로 넘긴다
+function toolWeek(w: World): ToolWeek {
+  const key = weekKey()
+  if (!w.tools || w.tools.key !== key) { if (w.tools) w.toolsLast = w.tools; w.tools = { key, mcp: {}, skill: {}, compact: 0 } }
+  return w.tools
+}
+// 다른 AI에게 붙여 넣어 코칭받는 Markdown. 횟수와 도구 이름만 담는다 (대화 내용·파일 경로 없음)
+function exportReport(w: World, lang: Lang) {
+  const en = lang === 'en', r = buildReport(w.week ?? emptyTally(), w.lastWeek?.tally, lang), t = w.week ?? emptyTally(), tw = toolWeek(w)
+  const names = (o: Record<string, number>) => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, n]) => `- ${k === '?' ? (en ? '(unnamed)' : '(이름 없음)') : k}: ${n}`)
+  const list = (title: string, xs: string[]) => (xs.length ? ['', `## ${title}`, '', ...xs] : [])
+  return [
+    en ? '# My Claude Code use this week (Ant Nest report)' : '# 이번 주 내 Claude Code 활용 (개미굴 리포트)',
+    '',
+    en ? `Counted since ${w.weekSince ?? w.snapDate ?? '-'} · ${r.total} actions. These are counts of tool calls by kind, with no conversation text or file paths. Please review how I use AI and coach me: what should I change to get more out of it?`
+      : `집계 시작 ${w.weekSince ?? w.snapDate ?? '-'} · 활동 ${r.total}번. 도구 호출을 종류별로 센 값이고, 대화 내용이나 파일 경로는 들어 있지 않아. 이걸 보고 내 AI 활용을 코칭해 줘. 더 잘 쓰려면 무엇을 바꾸면 좋을까?`,
+    '', en ? '## Activity mix' : '## 활동 분포', '',
+    en ? '| Kind | Count | Share | vs last week |' : '| 갈래 | 횟수 | 비율 | 지난주 대비 |', '|---|---|---|---|',
+    ...r.rows.map(x => `| ${x.label} | ${x.n} | ${x.pct}% | ${x.diff === undefined ? '-' : (x.diff > 0 ? '+' : '') + x.diff} |`),
+    '', en ? `Errors: ${t.bugs}, fixed: ${t.fixed}. Conversations summarized (context compaction): ${tw.compact}.` : `오류 ${t.bugs}번, 고침 ${t.fixed}번. 긴 대화 압축 ${tw.compact}번.`,
+    ...list(en ? 'External tools (MCP)' : '외부 도구 (MCP)', names(tw.mcp)),
+    ...list(en ? 'Skills' : '스킬', names(tw.skill)),
+    '', `${en ? 'Colony type' : '군락 유형'}: ${r.type}`,
+    ...list(en ? 'Doing well' : '잘하고 있는 점', r.good.map(x => `- ${x}`)),
+    ...list(en ? 'Using less' : '덜 쓰는 점', r.gaps.map(x => `- ${x}`)),
+    ...list(en ? 'Ideas to try' : '해 볼 만한 것', r.tips.map(x => `- ${x}`)),
+    ...list(en ? 'Questions to think through with me' : '같이 생각해 볼 질문', (en
+      ? ['Do I verify enough (tests, checking the screen) after changes?', 'Which repeated work could become a skill or a scheduled automation?', 'If long conversations get summarized often, how should I split my work?', 'Which tasks would suit delegation or parallel agents?']
+      : ['바꾼 뒤 테스트나 화면 확인 같은 검증을 충분히 하고 있나?', '반복하는 일 중에 스킬이나 예약 자동화로 옮길 만한 것은?', '긴 대화가 자주 압축된다면 작업을 어떻게 나누면 좋을까?', '위임이나 병렬 에이전트에 맡기기 좋은 일은?']).map(x => `- ${x}`)),
+    '', '---', `ant-nest ${VERSION} · https://github.com/findot-ai/ant-nest`, '',
+  ].join('\n')
+}
