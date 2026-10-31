@@ -3,6 +3,13 @@
 Every version of Ant Nest, newest first. Each entry is written in English, then Korean.
 개미굴의 모든 버전 기록입니다. 최신순이고, 각 항목은 영문 다음 국문입니다.
 
+## 0.16.1
+
+- Dashboard bars were drawn with block characters that came out uneven on desktop. They are now colored filled and empty segments that line up on every surface.
+- The legend under the picture shows a whole number of majors. Claude app tools get readable pasture names (Claude App, Scheduled Tasks, Claude Docs).
+- 대시보드 막대가 데스크톱에서 들쭉날쭉하던 문제를 고쳤습니다. 블록 문자 대신 색칠한 찬 칸·빈 칸으로 그려 어디서나 가지런합니다.
+- 그림 아래 범례의 병정 수를 정수로 표시하고, Claude 앱 도구의 목초지 이름을 읽기 쉽게 정리했습니다(Claude App, Scheduled Tasks, Claude Docs).
+
 ## 0.16.0
 
 - Tools tab (`/ant tools`): the MCP servers and skills that fed the colony this week, with counts, plus built-in work and how often conversations were summarized.

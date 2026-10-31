@@ -24,9 +24,10 @@ import { classify, colonyType, isTestLike, buildReport } from './usage'
 import type { Use } from './usage'
 
 type Ev = { tool: string; failed: boolean; testFail: boolean; use: Use; mcpTool: string }
-const VERSION = '0.16.0'
+const VERSION = '0.16.1'
 // 업데이트 직후 처음 켜질 때 한 번 알려 줄 새 기능 (최근 것만, 전체는 CHANGELOG.md)
 const WHATS_NEW: Record<string, [string, string]> = {
+  '0.16.1': ['대시보드 막대그래프가 데스크톱에서 고르게 보이도록 수정 · 목초지 이름 정리', 'Dashboard bars render evenly on desktop · tidier pasture names'],
   '0.16.0': ['도구 지도 탭 · AI 코칭용 리포트 내보내기 · 쉬는 개미들 · 대화 압축은 창고 갈무리로', 'Tools tab · export your report for AI coaching · resting ants · summaries now tidy the storage'],
   '0.15.0': ['업데이트 알림 · 방끼리 이어지는 굴과 샛길 · 기록 5개씩 넘겨 보기 · 눈에 띄는 병정개미와 생물', 'Update notes · chambers that branch and link up · paged history · easy-to-spot majors and creatures'],
 }
@@ -413,7 +414,8 @@ export const register: Register = (on, options) => {
     const tab = await read($, tabAtom), logPage = await read($, logPageAtom)
     const en = lang === 'en', sp = SP(w), pop = Math.round(workers(w) + majors(w)), hr = hour(w)  // h는 JSX 함수 이름이라 쓰지 않는다
     const clock = `${hr < 12 ? T.am : T.pm} ${hr % 12 === 0 ? 12 : hr % 12}${T.hourSuffix}`
-    const bar = (v: number, max: number, n = 10) => { const k = Math.max(0, Math.min(n, Math.round((v / Math.max(1, max)) * n))); return '█'.repeat(k) + '░'.repeat(n - k) }
+    // 막대: 블록 문자는 데스크톱 글꼴에서 폭이 들쭉날쭉해서, 배경색을 칠한 공백 두 토막(찬 칸·빈 칸)으로 그린다
+    const bar = (v: number, max: number, n = 10) => { const k = Math.max(0, Math.min(n, Math.round((v / Math.max(1, max)) * n))); return [k, n - k] as [number, number] }
     // 창이 넓으면 그림은 왼쪽, 대시보드는 오른쪽에 나란히
     const full = (e.props.bodyColumns || 60) * 8, wide = e.surface !== 'terminal' && full >= 1100
     let picture
@@ -426,7 +428,7 @@ export const register: Register = (on, options) => {
       picture = <Svg source={svg(w, ants, lang, pw, frame, (frame % FRAMES_PER_HOUR) / FRAMES_PER_HOUR)} alt={T.alt(pop)} width={pw} height={Math.round((pw * visibleRows(w)) / W)} />
     }
     // 그림 아래 범례: 병정과 생물을 일개미와 구분해 읽게
-    if (picture && e.surface !== 'terminal') picture = <Box flexDirection="column">{picture}<Text size="caption" dimColor>{en ? `● small dark ant = worker · ◆ big ant with a large head and pale jaws = major (${majors(w)})${w.guests.length ? ' · glowing = visiting creature' : ''}` : `● 작은 검은 개미 = 일개미 · ◆ 머리가 크고 턱이 밝은 큰 개미 = 병정 (${majors(w)}마리)${w.guests.length ? ' · 빛나는 것 = 찾아온 생물' : ''}`}</Text></Box>
+    if (picture && e.surface !== 'terminal') picture = <Box flexDirection="column">{picture}<Text size="caption" dimColor>{en ? `● small dark ant = worker · ◆ big ant with a large head and pale jaws = major (${Math.round(majors(w))})${w.guests.length ? ' · glowing = visiting creature' : ''}` : `● 작은 검은 개미 = 일개미 · ◆ 머리가 크고 턱이 밝은 큰 개미 = 병정 (${Math.round(majors(w))}마리)${w.guests.length ? ' · 빛나는 것 = 찾아온 생물' : ''}`}</Text></Box>
     // 위협 알림 띠
     const threats = w.threats.map(x => (x.k === 'centipede' ? (en ? `⚠ Centipede inside: make the failing ${x.tool} call succeed to drive it out` : `⚠ 지네 침입: 실패하던 ${x.tool}를 다시 성공시키면 물리칩니다`) : (en ? '⚠ Spider web on the trail: fix the error to cut it down' : '⚠ 길목에 거미줄: 오류를 고치면 걷어 냅니다')))
     if (w.raid) threats.push(en ? '⚔ The samurai raiders are out on a slave raid' : '⚔ 사무라이개미 습격대가 노예사냥을 나갔습니다')
@@ -445,8 +447,8 @@ export const register: Register = (on, options) => {
     const now = snapshot(w), before = w.snap ?? now
     const dl = (k: keyof typeof now) => now[k] - before[k]
     const delta = (d: number) => d === 0 ? null : <Text size="footnote" mono tabular color={d > 0 ? 'success' : 'error'}> ({d > 0 ? '+' : ''}{d})</Text>
-    const row = (label: string, value: string, b?: string, ds: number[] = []) => (
-      <Box justifyContent="space-between" gap={1}><Text size="footnote">{label}</Text><Text size="footnote" mono tabular>{b ? `${b} ` : ''}{value}{ds.map(delta)}</Text></Box>
+    const row = (label: string, value: string, b?: [number, number], ds: number[] = []) => (
+      <Box justifyContent="space-between" gap={1}><Text size="footnote">{label}</Text><Box gap={1} alignItems="center">{b && <Text size="footnote" mono><Text backgroundColor="#d4a24c">{' '.repeat(b[0])}</Text><Text backgroundColor="#4a4038">{' '.repeat(b[1])}</Text></Text>}<Text size="footnote" mono tabular>{value}{ds.map(delta)}</Text></Box></Box>
     )
     const cap = capacity(w), t = w.today
     const usageRows: [string, number][] = [[T.exploreS, t.explore], [T.buildS, t.build], [T.huntS, t.hunt], [en ? 'Raise' : '육성', t.raise], [en ? 'Herd (MCP)' : '목축(MCP)', t.mcp], [en ? 'Trail (skill)' : '길(스킬)', t.skill], [en ? 'Instinct (auto)' : '본능(자동화)', t.auto], [en ? 'Expedition' : '원정(병렬)', t.parallel], [en ? 'Ship' : '출시', t.ship ?? 0]]

@@ -567,9 +567,9 @@ export function moveAnts(w: World, ants: Ant[]) {
 
 // ---------- 외부 목초지(MCP 서버 하나 = 진딧물 나무 하나) ----------
 // MCP 서버 이름을 목초지 이름으로: 내부 ID처럼 생긴 이름은 짧게 줄인다
-const KNOWN: [RegExp, string][] = [[/drive/i, 'Google Drive'], [/gmail/i, 'Gmail'], [/calendar/i, 'Google Calendar'], [/sheets?/i, 'Google Sheets'], [/docs?\b|google_docs/i, 'Google Docs'],
+const KNOWN: [RegExp, string][] = [[/claude[_-]?docs/i, 'Claude Docs'], [/drive/i, 'Google Drive'], [/gmail/i, 'Gmail'], [/calendar/i, 'Google Calendar'], [/sheets?/i, 'Google Sheets'], [/docs?\b|google_docs/i, 'Google Docs'],
   [/slack/i, 'Slack'], [/notion/i, 'Notion'], [/github/i, 'GitHub'], [/gitlab/i, 'GitLab'], [/figma/i, 'Figma'], [/linear/i, 'Linear'], [/atlassian|jira|confluence/i, 'Atlassian'],
-  [/canva/i, 'Canva'], [/hubspot/i, 'HubSpot'], [/asana/i, 'Asana'], [/firebase/i, 'Firebase'], [/supabase/i, 'Supabase'], [/stripe/i, 'Stripe'], [/sentry/i, 'Sentry'], [/vercel/i, 'Vercel'], [/registry/i, 'MCP Registry']]
+  [/canva/i, 'Canva'], [/hubspot/i, 'HubSpot'], [/asana/i, 'Asana'], [/firebase/i, 'Firebase'], [/supabase/i, 'Supabase'], [/stripe/i, 'Stripe'], [/sentry/i, 'Sentry'], [/vercel/i, 'Vercel'], [/registry/i, 'MCP Registry'], [/ccd[_-]?session/i, 'Claude App'], [/scheduled[_-]?tasks?/i, 'Scheduled Tasks'], [/terminal/i, 'Terminal'], [/claude[_-]?(in[_-]?)?chrome/i, 'Chrome'], [/higgsfield/i, 'Higgsfield']]
 // MCP 서버 이름을 사람이 읽는 이름으로: 내부 ID처럼 생긴 이름은 그 서버 도구 이름에서 서비스를 짐작한다
 export function prettyServer(name: string, tool = '') {
   const n = name.replace(/^(mcp|server|plugin|claude_ai)[-_]/i, '')
