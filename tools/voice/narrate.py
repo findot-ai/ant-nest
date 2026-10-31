@@ -12,10 +12,10 @@ SEG = {
         (17.0, 2.9, 'See how much it grew since yesterday,'), (20.0, 3.1, 'get a weekly report on how you use AI,'), (23.2, 2.5, 'which tools fed it,'),
         (25.8, 2.3, 'and a dex of real nest creatures.'), (28.3, 4.2, 'Free, zero tokens. What will your colony become?')],
 }[lang]
-os.makedirs(fos.environ.get('VOICE_MODELS', 'media-out/tts') + '/seg-{lang}', exist_ok=True)
+os.makedirs(os.environ.get('VOICE_MODELS', 'media-out/tts') + f'/seg-{lang}', exist_ok=True)
 parts = []; prev_end = 0.0
 for i, (t, slot, text) in enumerate(SEG):
-    f = fos.environ.get('VOICE_MODELS', 'media-out/tts') + '/seg-{lang}/{i}.wav'; speed = 1.05
+    f = os.environ.get('VOICE_MODELS', 'media-out/tts') + f'/seg-{lang}/{i}.wav'; speed = 1.05
     for _ in range(4):
         subprocess.run(['python3', say, f, str(speed), text], check=True, capture_output=True)
         d = sf.info(f).duration
