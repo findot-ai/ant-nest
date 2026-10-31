@@ -1,6 +1,7 @@
 # 장면 시각에 맞춘 내레이션: 문장마다 음성을 만들고, 칸보다 길면 빠르게 다시 만든 뒤 한 트랙으로 합친다
-import sys, subprocess, soundfile as sf, os, json
+import sys, subprocess, soundfile as sf, os, json, zipfile, tempfile
 lang, out = sys.argv[1], sys.argv[2]
+PRE = sys.argv[3] if len(sys.argv) > 3 else None   # edge_lines.py로 만든 zip 또는 폴더 (선택)
 say = os.path.join(os.path.dirname(__file__), 'say_ko.py') if lang == 'ko' else os.path.join(os.path.dirname(__file__), 'say_en.py')
 SEG = {
  'ko': [(0.3, 3.6, '클로드 코드 옆에서 개미를 키워요.'), (4.0, 2.5, '파일을 읽으면 채집,'), (6.6, 2.5, '코드를 고치면 굴착,'),
@@ -12,10 +13,20 @@ SEG = {
         (17.0, 2.9, 'See how much it grew since yesterday,'), (20.0, 3.1, 'get a weekly report on how you use AI,'), (23.2, 2.5, 'which tools fed it,'),
         (25.8, 2.3, 'and a dex of real nest creatures.'), (28.3, 4.2, 'Free, zero tokens. What will your colony become?')],
 }[lang]
+if PRE and PRE.endswith('.zip'):
+    tmpd = tempfile.mkdtemp(); zipfile.ZipFile(PRE).extractall(tmpd); PRE = tmpd
 os.makedirs(os.environ.get('VOICE_MODELS', 'media-out/tts') + f'/seg-{lang}', exist_ok=True)
 parts = []; prev_end = 0.0
 for i, (t, slot, text) in enumerate(SEG):
     f = os.environ.get('VOICE_MODELS', 'media-out/tts') + f'/seg-{lang}/{i}.wav'; speed = 1.05
+    if PRE:
+        src = os.path.join(PRE, f'{i:02d}.mp3')
+        subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-ar', '44100', f], check=True)
+        d = sf.info(f).duration
+        if d > slot * 1.15:   # 너무 길면 살짝만 빠르게 (최대 1.15배)
+            tmp = f + '.t.wav'; subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', f, '-filter:a', f'atempo={min(1.15, d / slot):.3f}', tmp], check=True); os.replace(tmp, f); d = sf.info(f).duration
+        t = max(t, prev_end + 0.12); prev_end = t + d
+        parts.append((t, f, round(d, 2), 1.0)); continue
     for _ in range(4):
         subprocess.run(['python3', say, f, str(speed), text], check=True, capture_output=True)
         d = sf.info(f).duration
