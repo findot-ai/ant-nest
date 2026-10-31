@@ -96,8 +96,8 @@ test('after an update the nest says once what is new', async ($, on) => {
   on('fs.list', () => { throw new Error('none') })
   on('fs.read', () => { throw new Error('none') })
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
-  expect(toasts.some(t => t.includes('v0.16.1'))).toBe(true)
-  expect(store.seenVersion).toBe('0.16.1')
+  expect(toasts.some(t => t.includes('v0.16.2'))).toBe(true)
+  expect(store.seenVersion).toBe('0.16.2')
 })
 
 test('tool map, compaction and the coaching export', async ($, on) => {

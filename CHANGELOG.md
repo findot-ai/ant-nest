@@ -3,6 +3,11 @@
 Every version of Ant Nest, newest first. Each entry is written in English, then Korean.
 개미굴의 모든 버전 기록입니다. 최신순이고, 각 항목은 영문 다음 국문입니다.
 
+## 0.16.2
+
+- The numbers after each dashboard bar sit in a fixed-width column, so the bars start at the same point on every row.
+- 대시보드 막대 뒤 숫자를 같은 폭에 두어, 막대들의 시작점이 위아래로 맞습니다.
+
 ## 0.16.1
 
 - Dashboard bars were drawn with block characters that came out uneven on desktop. They are now colored filled and empty segments that line up on every surface.
